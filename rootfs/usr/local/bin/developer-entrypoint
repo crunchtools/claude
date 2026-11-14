@@ -23,6 +23,20 @@ mkdir -p "$claude_dir/skills" "$claude_dir/hooks" "$workdir"
 
 # Identity is copied in, not linked: the mount is read-only and Claude Code
 # rewrites its own settings file. The mounted copy wins again at next start.
+#
+# One key survives the copy: skipDangerousModePermissionPrompt, which is where
+# Claude Code records that a person accepted the Bypass Permissions warning.
+# It is written to this file, so replacing the file at every start asked them
+# again at every restart -- and a worker whose pane is respawned unattended
+# sat at the warning until someone attached. The entrypoint never sets it; it
+# only keeps an acceptance a person gave.
+accepted=
+if [ -f "$claude_dir/settings.json" ] && python3 -c '
+import json, sys
+sys.exit(0 if json.load(open(sys.argv[1])).get("skipDangerousModePermissionPrompt") is True else 1)
+' "$claude_dir/settings.json" 2>/dev/null; then
+  accepted=1
+fi
 for name in CLAUDE.md settings.json; do
   if [ -f "$config_dir/$name" ]; then
     install -m 0644 "$config_dir/$name" "$claude_dir/$name"
@@ -30,6 +44,17 @@ for name in CLAUDE.md settings.json; do
     log "no $name in $config_dir"
   fi
 done
+if [ -n "$accepted" ] && [ -f "$claude_dir/settings.json" ]; then
+  python3 -c '
+import json, sys
+path = sys.argv[1]
+with open(path) as handle:
+    settings = json.load(handle)
+settings["skipDangerousModePermissionPrompt"] = True
+with open(path, "w") as handle:
+    json.dump(settings, handle, indent=2)
+' "$claude_dir/settings.json" || log "could not keep the Bypass Permissions acceptance"
+fi
 # Only the image's managed hooks run (allowManagedHooksOnly), so a hook in
 # this home, written by the agent or planted by a checkout, does nothing.
 # Clear the old copies so nobody mistakes them for live ones.
@@ -392,9 +417,46 @@ ENVEOF
   log "gatehouse.env points at the gateway: $url"
 }
 
+# An ssh client and a key, for the one failure nothing else covers: the
+# gateway itself. Every tool this agent has arrives through the Trentina
+# gateway, so when the gateway is down the agent has no tools at all -- not
+# even the systemd tools that would restart it. This is the way back in.
+#
+# The image supplies the mechanism only. The key, the account and the host to
+# reach are in the read-only identity mount, because they are deployment
+# facts: a laptop copy of this image with nothing mounted gets no ssh
+# identity and behaves exactly as before. Nothing listens in the container;
+# this is outbound, and there is still no sshd here.
+install_ssh_identity() {
+  local src="$config_dir/ssh" dest="$HOME/.ssh" name
+  local ssh=${JOSUI_SSH_CMD:-ssh}
+  [ -d "$src" ] || return 0
+  if ! command -v "$ssh" > /dev/null 2>&1; then
+    log "$src is mounted but there is no $ssh in this image"
+    return 0
+  fi
+  mkdir -p "$dest"
+  chmod 0700 "$dest"
+  # Copied, not pointed at: ssh refuses a private key that is readable by
+  # anyone else, and the mode on a bind mount is whatever the host set.
+  for name in id_ed25519 id_ecdsa id_rsa config known_hosts; do
+    [ -f "$src/$name" ] || continue
+    install -m 0600 "$src/$name" "$dest/$name"
+  done
+  if ! ls "$dest"/id_* > /dev/null 2>&1; then
+    log "$src has no private key, so ssh has no identity"
+    return 0
+  fi
+  if [ ! -f "$dest/known_hosts" ]; then
+    log "$src has no known_hosts, so the first connection will have nothing to verify against"
+  fi
+  log "ssh identity installed from $src"
+}
+
 set_git_identity
 install_mcp_env
 install_gatehouse_env
+install_ssh_identity
 
 cd "$workdir"
 # Remote Control redraws a terminal status screen on stdout every second.

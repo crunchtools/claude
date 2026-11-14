@@ -47,16 +47,16 @@
 # for; it is set on these containers only, and every other container on the
 # host keeps its confinement.
 #
-# Josui Prime has none of this. That is the trade for a local inner loop, and
-# it is why this is a separate image with its own Trentina profile rather than
-# a flag on the production one.
+# Josui Prime runs this image too, and gets none of those flags: it
+# dispatches rather than builds, so it never runs a nested engine, and it keeps
+# its SELinux label. The flags belong to the unit, not to the image.
 #
 # Build happens in GitHub Actions (.github/workflows/container.yml).
 
 FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.6.0"
+LABEL version="1.7.0"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
