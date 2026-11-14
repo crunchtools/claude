@@ -12,8 +12,6 @@ All notable changes to this project are documented here. The format follows
 
 - Josui Prime runs this image (worker mode with `JOSUI_RC=1`), replacing the
   separate UBI `josui` image for the dispatcher.
-- An `ssh/` directory in the identity mount is installed as `~/.ssh`, ported
-  from the josui image.
 
 ### Fixed
 

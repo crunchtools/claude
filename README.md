@@ -66,12 +66,13 @@ Josui Prime is a worker too: `JOSUI_RC=1`, `JOSUI_NAME="Josui Prime"`, with
 none of the nested-podman flags and its SELinux label kept, since it dispatches
 rather than builds.
 
-Two things survive a restart that the copy-in would otherwise erase. A person's
+One thing survives a restart that the copy-in would otherwise erase. A person's
 acceptance of the Bypass Permissions warning (`skipDangerousModePermissionPrompt`
 in `~/.claude/settings.json`) is carried over when the mounted `settings.json`
 replaces the old one. The entrypoint keeps an acceptance but never gives one.
-An `ssh/` directory in the identity mount (`id_*`, `config`, `known_hosts`) is
-copied to `~/.ssh` at 0600, which is how Prime reaches other hosts.
+
+Prime holds no ssh key. Like every seat, it reaches other hosts only through
+the gateway's host tools (autonomous-agent profile: no direct egress).
 
 ## Running a repository's own gates
 
