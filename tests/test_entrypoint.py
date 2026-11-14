@@ -617,5 +617,56 @@ class EntrypointTest(unittest.TestCase):
         self.assertNotIn("skipDangerousModePermissionPrompt", data)
 
 
+    # A worker with a homeserver is ONE session, held by claude-agent.
+    def test_texted_worker_is_one_session_under_claude_agent(self) -> None:
+        self.fake_tmux()
+        env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_RC": "1", "JOSUI_NAME": "Josui Prime"}
+        result = self.run_entrypoint(env=env)
+        # The stand-in claude-agent exits 7: the container ends with it.
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertEqual(
+            (self.home / "agent-args").read_text().splitlines(),
+            ["run", "--", "-n", "Josui Prime", "--remote-control", "Josui Prime",
+             "--permission-mode", "bypassPermissions"],
+        )
+        # No Remote Control server and no second Claude Code.
+        self.assertFalse((self.home / "claude-args").exists())
+        calls = (self.home / "tmux-args").read_text().splitlines()
+        self.assertEqual(
+            calls[0],
+            f"new-session -d -s dev -x 160 -y 50 -c {self.home / 'work'} sh -c "
+            "while :; do claude-agent attach --rw; sleep 2; done",
+        )
+        self.assertNotIn("has-session -t dev", calls)
+        self.assertIn("under claude-agent with texting", result.stderr)
+        self.assertEqual(self.agent_env()["CLAUDE_AGENT_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
+
+    def test_worker_without_a_homeserver_is_not_supervised(self) -> None:
+        agent = self.root / "bin/claude-agent"
+        agent.write_text('#!/bin/bash\ntouch "$HOME/agent-ran"\n')
+        agent.chmod(0o755)
+        result, calls = self.worker_calls()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.home / "agent-ran").exists())
+        self.assertIn("claude -n Vertex 1", calls[0])
+
+
+    def test_texted_worker_without_remote_control_omits_it(self) -> None:
+        self.fake_tmux()
+        env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_NAME": "Josui Prime"}
+        self.run_entrypoint(env=env)
+        self.assertEqual(
+            (self.home / "agent-args").read_text().splitlines(),
+            ["run", "--", "-n", "Josui Prime", "--permission-mode", "bypassPermissions"],
+        )
+
+    def test_texted_worker_without_tmux_fails_loudly(self) -> None:
+        env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_TMUX_CMD": "tmux-that-is-not-installed"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("JOSUI_MODE=worker needs tmux-that-is-not-installed", result.stderr)
+        self.assertFalse((self.home / "agent-args").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

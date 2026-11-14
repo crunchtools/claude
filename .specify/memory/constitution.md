@@ -1,19 +1,26 @@
 # developer Constitution
 
-> **Version:** 1.6.0
+> **Version:** 2.0.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.41.0
 > **Profile:** Autonomous Agent
 
-Claude Code packaged as a container for agents that **build** the crunchtools
-fleet. Three instances run on gloval as developer1-3, sharing one Trentina
-profile, each with its own clones and its own state.
+Claude Code packaged as a container image for crunchtools agents. The image is
+tooling; the role an instance plays is set by its unit: what is mounted, which
+gateway profile its token belongs to, and its environment. Two roles run it:
 
-It is not [josui](https://github.com/crunchtools/josui), and the difference is
-the point: josui.crunchtools.com is one agent that OPERATES the fleet — the
-operator role on the gateway, the owner's texts, production reach. These three
-have none of that. The image began as `Containerfile.dev` in that repo and
+- **Josui Prime** — one instance, on dolza. The dispatcher that OPERATES the
+  fleet: Prime's identity and state, the operator profile on dolza's gateway,
+  and the owner's texts (RCS through Matrix, `JOSUI_MATRIX_HOMESERVER`). It
+  carries none of the nested-engine deviations below and keeps its SELinux
+  label.
+- **Workers** — Vertex 1-4 on dolza and Max 1-4 on exedore, which BUILD it.
+  The rest of this document, unless it names Prime, is about them.
+
+The difference between the roles is the point, and it is held by the units,
+not the image: a worker never gets Prime's identity, state, token or text
+channel. The image began as `Containerfile.dev` in that repo and
 inherits its entrypoint, its mount contract and its `JOSUI_*` environment
 prefix; that inheritance is a starting point, not a commitment, and renaming
 the prefix is its own change with a window where both are accepted.
@@ -45,15 +52,19 @@ the agent is in.
 
 ## Layer 1 — Trust Boundary Architecture
 
-Three identical agents behind one gateway profile. The gateway is the
+Identical workers behind one gateway profile per host (dolza's `developer`, gloval's `developer` for the exedore seats). The gateway is the
 deterministic enforcer and holds the quarantined reader; the agent never
 fetches from the web itself (`WebFetch` and `WebSearch` are denied in its
 settings). Attended mode: each acts only when the operator opens a conversation
-over Remote Control, or types into its tmux session. There is **no Matrix
+over Remote Control, or types into its tmux session. A worker has **no Matrix
 channel and no text path** — texts reach Josui Prime, which is the right front
-door for an agent that can act on production.
+door for an agent that can act on production. Prime's text path is the one
+session it already has: with a homeserver set, `claude-agent run` holds it and
+the Matrix bridge delivers into it, so texts, Remote Control, voice and tmux
+are one conversation. Its Matrix traffic goes through dolza's gateway
+(`/matrix`, a tool-less `josui-matrix` profile chosen by the pod's address).
 
-One profile for three containers is a deliberate trade, made by the owner: the
+One profile for several workers is a deliberate trade, made by the owner: the
 gateway's audit cannot tell them apart. Their source addresses differ, so the
 distinction exists at the perimeter if it is ever needed.
 
@@ -211,6 +222,17 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
   production. They are what this agent is for. It is contained by having no
   production to reach, not by removing them.
 
+- **Worker egress is not isolated yet (2.0.0).** On gloval the seats sat on
+  an internal network with no DNS whose only other member was the gateway, and
+  their HTTPS left through the gateway's client-egress allowlist; the Trust
+  Boundary above describes that. The dolza Vertex workers share the agents pod
+  on dolza's `crunchtools` network, and the exedore Max seats have the host's
+  network, so neither has that boundary today. Until it is rebuilt (an
+  nftables allowlist on exedore, and the pod on an internal network routed
+  through dolza's gateway), a worker's direct egress is limited only by what
+  it is asked to do. The SELinux deviation's list of compensations above names
+  the internal network; for these workers that item is missing.
+
 ## Service
 
 | Attribute | Value |
@@ -224,6 +246,7 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-11-14 | The image has two roles. Josui Prime moves onto it from the UBI josui image (owner allowed Fedora; one image, not two), with Prime's identity, state, operator profile and RCS text path set by its unit. Workers (Vertex 1-4 on dolza, Max 1-4 on exedore, formerly developer1-3 on gloval) keep every boundary this document set, including no text path. MAJOR because "an agent built from this image has no production reach" stops being true of the image and becomes true of the worker units |
 | 1.6.0 | 2026-11-11 | The blocking Trivy gate and `.trivyignore` are retired along with the fleet's build-time scan (constitution 1.40.0): published images are scanned on a schedule by the fleet CVE check (RT #1551) |
 | 1.5.0 | 2026-11-07 | Gatehouse calls `/proxy/llm/openrouter-gatehouse/v1`, a second gateway route to the same upstream carrying its own key, so a seat has two token endpoints: one the L3 judge spends on and one Gatehouse does. All Gatehouse usage then lands on one key fleet-wide (RT#1559). Also ships #12: a seat tracks the skills repository's default branch rather than whatever its volume was seeded with |
 | 1.4.0 | 2026-11-07 | The gateway's `/proxy/llm/openrouter` route on the seat's own token is available to Gatehouse: the entrypoint writes that `gatehouse.env` when the mount provides none. A mounted key still wins, so deleting it is the cutover and the image deploys inert -- the Gatehouse floor is set by the PUSHED repo's python-sdlc pin, which this image cannot raise. Verified end to end on developer3 with Gatehouse 0.24.0. RT#1559 |

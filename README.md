@@ -62,6 +62,11 @@ as answered, so the unit never stalls on a first-run question. A pane whose
 program ends is restarted ten seconds later (a `pane-died` hook). Here the
 tmux session *is* watched: the container ends when the session does.
 
+A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-agent run`
+instead: one session that the Matrix bridge texts into, Remote Control reaches
+and `claude-agent send` prompts, with window 0 of `dev` running
+`claude-agent attach --rw` so `tmux attach` still shows it.
+
 Josui Prime is a worker too: `JOSUI_RC=1`, `JOSUI_NAME="Josui Prime"`, with
 none of the nested-podman flags and its SELinux label kept, since it dispatches
 rather than builds.
