@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-11-14
+
+### Fixed
+- `LANG=C.UTF-8` in the image. `podman exec -it <seat> tmux attach -t dev`
+  had no locale, so tmux replaced every non-ASCII character with `_` and the
+  Claude Code screen came out garbled.
+
 ## [1.8.1] - 2026-11-14
 
 ### Fixed
