@@ -58,14 +58,14 @@
 FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.8.0"
+LABEL version="1.8.1"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
 # claude-agent is tested on Josui Prime before it reaches a dev container:
 # bump both files together, by hand.
 ARG CLAUDE_CODE_VERSION=2.1.304
-ARG CLAUDE_AGENT_VERSION=0.2.1
+ARG CLAUDE_AGENT_VERSION=1.0.1
 
 USER 0
 

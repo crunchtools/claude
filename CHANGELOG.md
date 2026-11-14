@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-11-14
+
+### Fixed
+- claude-agent 1.0.1 (was 0.2.1): the Matrix bridge names itself, so a
+  homeserver behind Cloudflare no longer refuses it with error 1010. Josui
+  Prime's texting depends on it.
+
 ## [1.8.0] - 2026-11-14
 
 ### Added
