@@ -430,9 +430,10 @@ server_args+=(--remote-control-session-name-prefix "${JOSUI_NAME:-josui}")
 # instead of the Remote Control server -- a worker that Josui Prime messages
 # as a peer and a person attaches to. JOSUI_RC=1 turns Remote Control on for
 # that same conversation (Max seats); Vertex workers cannot use it and leave
-# it off. Window 1 is a shell, and a quit Claude Code leaves its pane to be
-# respawned, as with JOSUI_TMUX. The container ends only when the tmux
-# session does.
+# it off. Window 1 is a shell. A pane whose program ends is restarted ten
+# seconds later by the pane-died hook -- a worker Prime cannot message is no
+# worker -- and the delay keeps one that cannot start (not logged in) from
+# spinning. The container ends only when the tmux session does.
 start_worker_session() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
   local args=(claude -n "$name")
@@ -447,6 +448,8 @@ start_worker_session() {
   args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
   "$tmux" new-session -d -s dev -x 200 -y 50 -c "$workdir" "${args[@]}"
   "$tmux" set-option -t dev remain-on-exit on 2>/dev/null || true
+  "$tmux" set-hook -t dev pane-died \
+    "run-shell -b 'sleep 10; tmux respawn-pane -t #{hook_pane}'" 2>/dev/null || true
   "$tmux" new-window -d -t dev -c "$workdir" 2>/dev/null || true
   log "worker '$name' is up in tmux session 'dev': podman exec -it <service> tmux attach -t dev"
 }

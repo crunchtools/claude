@@ -556,6 +556,12 @@ class EntrypointTest(unittest.TestCase):
         self.assertFalse((self.home / "claude-args").exists())
         self.assertIn("worker 'Vertex 1' is up", result.stderr)
 
+    def test_worker_pane_is_restarted_when_its_program_ends(self) -> None:
+        _, calls = self.worker_calls()
+        self.assertIn(
+            "set-hook -t dev pane-died run-shell -b 'sleep 10; tmux respawn-pane -t #{hook_pane}'", calls
+        )
+
     def test_worker_with_remote_control_names_it(self) -> None:
         _, calls = self.worker_calls(JOSUI_NAME="Max 1", JOSUI_RC="1")
         self.assertIn("claude -n Max 1 --remote-control Max 1 --permission-mode bypassPermissions", calls[0])

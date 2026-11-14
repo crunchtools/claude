@@ -58,8 +58,9 @@ interactive Claude Code (`claude -n "$JOSUI_NAME"`) in the same tmux session
 `JOSUI_RC=1` turns Remote Control on for that conversation (the Max seats on
 Exedore); the Vertex workers on Dolza cannot use it and leave it unset.
 Onboarding, the Remote Control dialog and trust in `JOSUI_WORKDIR` are recorded
-as answered, so the unit never stalls on a first-run question. Here the tmux
-session *is* watched: the container ends when the session does.
+as answered, so the unit never stalls on a first-run question. A pane whose
+program ends is restarted ten seconds later (a `pane-died` hook). Here the
+tmux session *is* watched: the container ends when the session does.
 
 ## Running a repository's own gates
 
