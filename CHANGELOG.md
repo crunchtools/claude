@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-14
+
+### Added
+
+- Josui Prime runs this image (worker mode with `JOSUI_RC=1`), replacing the
+  separate UBI `josui` image for the dispatcher.
+
+### Fixed
+
+- A person's acceptance of the Bypass Permissions warning survives a restart.
+  The mounted `settings.json` replaced it at every start, so each restart
+  asked again and a respawned worker waited at the warning.
+
 ## [1.6.0] - 2026-11-12
 
 ### Fixed

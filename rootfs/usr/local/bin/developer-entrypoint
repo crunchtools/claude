@@ -23,6 +23,20 @@ mkdir -p "$claude_dir/skills" "$claude_dir/hooks" "$workdir"
 
 # Identity is copied in, not linked: the mount is read-only and Claude Code
 # rewrites its own settings file. The mounted copy wins again at next start.
+#
+# One key survives the copy: skipDangerousModePermissionPrompt, which is where
+# Claude Code records that a person accepted the Bypass Permissions warning.
+# It is written to this file, so replacing the file at every start asked them
+# again at every restart -- and a worker whose pane is respawned unattended
+# sat at the warning until someone attached. The entrypoint never sets it; it
+# only keeps an acceptance a person gave.
+accepted=
+if [ -f "$claude_dir/settings.json" ] && python3 -c '
+import json, sys
+sys.exit(0 if json.load(open(sys.argv[1])).get("skipDangerousModePermissionPrompt") is True else 1)
+' "$claude_dir/settings.json" 2>/dev/null; then
+  accepted=1
+fi
 for name in CLAUDE.md settings.json; do
   if [ -f "$config_dir/$name" ]; then
     install -m 0644 "$config_dir/$name" "$claude_dir/$name"
@@ -30,6 +44,17 @@ for name in CLAUDE.md settings.json; do
     log "no $name in $config_dir"
   fi
 done
+if [ -n "$accepted" ] && [ -f "$claude_dir/settings.json" ]; then
+  python3 -c '
+import json, sys
+path = sys.argv[1]
+with open(path) as handle:
+    settings = json.load(handle)
+settings["skipDangerousModePermissionPrompt"] = True
+with open(path, "w") as handle:
+    json.dump(settings, handle, indent=2)
+' "$claude_dir/settings.json" || log "could not keep the Bypass Permissions acceptance"
+fi
 # Only the image's managed hooks run (allowManagedHooksOnly), so a hook in
 # this home, written by the agent or planted by a checkout, does nothing.
 # Clear the old copies so nobody mistakes them for live ones.

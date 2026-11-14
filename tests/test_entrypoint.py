@@ -596,6 +596,26 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(self.run_entrypoint().returncode, 0)
         self.assertFalse((self.home / "agent-ran").exists())
 
+    # The Bypass Permissions acceptance lives in settings.json, which is
+    # replaced from the mount at every start.
+    def test_a_bypass_acceptance_survives_a_restart(self) -> None:
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        settings = self.home / ".claude/settings.json"
+        data = json.loads(settings.read_text())
+        data["skipDangerousModePermissionPrompt"] = True
+        settings.write_text(json.dumps(data))
+        (self.config / "settings.json").write_text('{"spinnerTipsEnabled": false}\n')
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        data = json.loads(settings.read_text())
+        self.assertIs(data["skipDangerousModePermissionPrompt"], True)
+        self.assertIs(data["spinnerTipsEnabled"], False)
+
+    def test_the_entrypoint_never_accepts_bypass_itself(self) -> None:
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        data = json.loads((self.home / ".claude/settings.json").read_text())
+        self.assertNotIn("skipDangerousModePermissionPrompt", data)
+
 
 if __name__ == "__main__":
     unittest.main()
