@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-14
+
+### Added
+
+- A worker with `JOSUI_MATRIX_HOMESERVER` (Josui Prime, texted over RCS) runs
+  its one session under `claude-agent run`, so texts, Remote Control, voice
+  and the terminal all reach the same conversation. tmux window 0 runs
+  `claude-agent attach --rw`.
+
 ## [1.7.0] - 2026-11-14
 
 ### Added

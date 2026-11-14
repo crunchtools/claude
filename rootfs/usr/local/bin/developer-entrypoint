@@ -479,12 +479,47 @@ start_worker_session() {
   log "worker '$name' is up in tmux session 'dev': podman exec -it <service> tmux attach -t dev"
 }
 
+# A worker with a homeserver (Josui Prime, texted over RCS through Matrix) is
+# one conversation held by claude-agent: the supervisor owns the pty, the
+# Matrix bridge delivers texts into it, Remote Control and voice
+# (`claude-agent send`) reach the same session. A second, separate text
+# session would split Prime in two, which is what the server path does.
+#
+# The supervisor draws nothing on its own stdout, so tmux window 0 runs
+# `claude-agent attach --rw` in a loop -- `tmux attach -t dev` still shows the
+# live session. 160x50 is the supervisor's fixed pty size. The supervisor is
+# the supervised pid: when Claude Code exits the container ends and the unit
+# restarts it.
+start_supervised_worker() {
+  local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
+  local args=(-n "$name")
+  if ! command -v "$tmux" > /dev/null 2>&1; then
+    log "JOSUI_MODE=worker needs $tmux, which is not in this image"
+    exit 1
+  fi
+  edit_state_json interactive
+  if [ "${JOSUI_RC:-}" = 1 ]; then
+    args+=(--remote-control "$name")
+  fi
+  args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
+  claude-agent run -- "${args[@]}" &
+  pids+=($!)
+  "$tmux" new-session -d -s dev -x 160 -y 50 -c "$workdir" \
+    sh -c 'while :; do claude-agent attach --rw; sleep 2; done'
+  "$tmux" new-window -d -t dev -c "$workdir" 2>/dev/null || true
+  log "worker '$name' is up under claude-agent with texting: podman exec -it <service> tmux attach -t dev"
+}
+
 # The Remote Control server (or, for a worker, the tmux session holding its
 # one conversation) and -- when a homeserver is configured -- claude-agent,
 # side by side. When either ends the container ends, and the unit restarts
 # both.
 pids=()
-if [ "${JOSUI_MODE:-server}" = worker ]; then
+supervised=
+if [ "${JOSUI_MODE:-server}" = worker ] && [ -n "$session" ]; then
+  start_supervised_worker
+  supervised=1
+elif [ "${JOSUI_MODE:-server}" = worker ]; then
   start_worker_session
   # Polled rather than waited on: tmux daemonises, so the session has no child
   # pid here to wait for.
@@ -494,7 +529,7 @@ else
   claude "${server_args[@]}" > /dev/null &
   pids+=($!)
 fi
-if [ -n "$session" ]; then
+if [ -n "$session" ] && [ -z "$supervised" ]; then
   claude-agent run -- --permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}" &
   pids+=($!)
 fi
