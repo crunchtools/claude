@@ -651,5 +651,22 @@ class EntrypointTest(unittest.TestCase):
         self.assertIn("claude -n Vertex 1", calls[0])
 
 
+    def test_texted_worker_without_remote_control_omits_it(self) -> None:
+        self.fake_tmux()
+        env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_NAME": "Josui Prime"}
+        self.run_entrypoint(env=env)
+        self.assertEqual(
+            (self.home / "agent-args").read_text().splitlines(),
+            ["run", "--", "-n", "Josui Prime", "--permission-mode", "bypassPermissions"],
+        )
+
+    def test_texted_worker_without_tmux_fails_loudly(self) -> None:
+        env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_TMUX_CMD": "tmux-that-is-not-installed"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("JOSUI_MODE=worker needs tmux-that-is-not-installed", result.stderr)
+        self.assertFalse((self.home / "agent-args").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
