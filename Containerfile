@@ -58,7 +58,7 @@
 FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.8.1"
+LABEL version="1.8.2"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
@@ -126,7 +126,10 @@ RUN chmod 0755 /usr/local/bin/developer-entrypoint && \
 # clones live there and survive a restart. The nested engine's storage is a
 # volume of its own mounted over .local/share/containers -- it is a cache, and
 # it does not belong in the state backup.
+# LANG: a tmux client started by `podman exec ... tmux attach` has no locale
+# otherwise, and tmux then draws every non-ASCII character as "_".
 ENV HOME=/home/podman \
+    LANG=C.UTF-8 \
     JOSUI_CONFIG_DIR=/etc/josui \
     JOSUI_SKILLS_DIR=/var/lib/josui/josui-skills \
     CLAUDE_AGENT=1 \
