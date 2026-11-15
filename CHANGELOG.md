@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-14
+
+### Added
+- ssh for Dolza admin seats (constitution 3.0.0): a unit that mounts a seat's
+  key, ssh config and known_hosts at `JOSUI_SSH_DIR` gets them copied to tmpfs
+  (`JOSUI_SSH_RUNTIME`, default `/tmp/josui-ssh`) with `~/.ssh` linked there,
+  so no key is ever written to the `$HOME` volume. With nothing mounted,
+  nothing happens.
+
 ## [1.8.2] - 2026-11-14
 
 ### Fixed

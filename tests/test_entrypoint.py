@@ -598,6 +598,109 @@ class EntrypointTest(unittest.TestCase):
 
     # The Bypass Permissions acceptance lives in settings.json, which is
     # replaced from the mount at every start.
+    # ssh for a Dolza admin seat (constitution 3.0.0).
+    def fake_ssh(self) -> Path:
+        ssh = self.root / "bin/ssh"
+        ssh.write_text("#!/bin/bash\nexit 0\n")
+        ssh.chmod(0o755)
+        return ssh
+
+    def seed_ssh_mount(self, *, known_hosts: bool = True, key: bool = True) -> Path:
+        src = self.root / "seat-ssh"
+        src.mkdir()
+        if key:
+            # The mount is the host's: a loose mode is what to expect.
+            (src / "id_ed25519").write_text("PRIVATE KEY\n")
+            (src / "id_ed25519").chmod(0o644)
+        (src / "config").write_text("Host gloval\n  Port 22422\n")
+        if known_hosts:
+            (src / "known_hosts").write_text("gloval ssh-ed25519 AAAA\n")
+        return src
+
+    def ssh_env(self, src: Path, runtime: Path | None = None) -> dict[str, str]:
+        if runtime is None:
+            # /dev/shm is tmpfs on every Linux, CI runners included.
+            shm = tempfile.mkdtemp(dir="/dev/shm")
+            self.addCleanup(shutil.rmtree, shm, True)
+            runtime = Path(shm) / "tmpfs-ssh"
+        self.ssh_runtime = runtime
+        return {**self.env, "JOSUI_SSH_DIR": str(src), "JOSUI_SSH_RUNTIME": str(runtime)}
+
+    def test_a_runtime_that_cannot_be_created_is_reported_not_fatal(self) -> None:
+        self.fake_ssh()
+        blocker = self.root / "blocker"
+        blocker.write_text("a file, not a directory\n")
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=blocker / "ssh"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("NOT installed", result.stderr)
+
+    def test_a_runtime_under_home_is_refused(self) -> None:
+        self.fake_ssh()
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=self.home / "keys"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("NOT installed", result.stderr)
+        self.assertEqual(list(self.home.rglob("id_ed25519")), [])
+
+    def test_a_runtime_that_is_not_tmpfs_is_refused(self) -> None:
+        disk = self.root / "disk-ssh"
+        if subprocess.run(["stat", "-f", "-c", "%T", str(self.root)], capture_output=True, text=True).stdout.strip() == "tmpfs":
+            self.skipTest("the scratch directory is itself on tmpfs here")
+        self.fake_ssh()
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=disk))
+        self.assertIn("NOT installed", result.stderr)
+        self.assertFalse((disk / "id_ed25519").exists())
+
+    def test_no_ssh_identity_unless_one_is_mounted(self) -> None:
+        self.fake_ssh()
+        result = self.run_entrypoint(env={**self.env, "JOSUI_SSH_DIR": str(self.root / "absent")})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.home / ".ssh").exists())
+
+    def test_a_mounted_identity_lands_in_tmpfs_never_in_home(self) -> None:
+        self.fake_ssh()
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount()))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        runtime = self.ssh_runtime
+        self.assertEqual(stat.S_IMODE(runtime.stat().st_mode), 0o700)
+        for name in ("id_ed25519", "config", "known_hosts"):
+            self.assertEqual(stat.S_IMODE((runtime / name).stat().st_mode), 0o600, name)
+        self.assertEqual((runtime / "id_ed25519").read_text(), "PRIVATE KEY\n")
+        # ~/.ssh is a link to tmpfs: nothing of the key is in the $HOME volume.
+        self.assertTrue((self.home / ".ssh").is_symlink())
+        self.assertEqual((self.home / ".ssh").resolve(), runtime.resolve())
+        self.assertEqual(list(self.home.rglob("id_ed25519")), [])
+
+    def test_a_real_ssh_dir_in_home_is_set_aside_not_deleted(self) -> None:
+        self.fake_ssh()
+        (self.home / ".ssh").mkdir(parents=True)
+        (self.home / ".ssh/note").write_text("kept\n")
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount()))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.home / ".ssh").is_symlink())
+        kept = list(self.home.glob(".ssh.before-tmpfs.*"))
+        self.assertEqual(len(kept), 1)
+        self.assertEqual((kept[0] / "note").read_text(), "kept\n")
+
+    def test_an_ssh_mount_without_a_key_is_reported_not_fatal(self) -> None:
+        self.fake_ssh()
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(key=False)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no private key", result.stderr)
+        self.assertFalse((self.home / ".ssh").exists())
+
+    def test_a_key_without_known_hosts_is_called_out(self) -> None:
+        self.fake_ssh()
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(known_hosts=False)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no known_hosts", result.stderr)
+
+    def test_an_ssh_identity_with_no_ssh_in_the_image_is_reported_not_fatal(self) -> None:
+        env = {**self.ssh_env(self.seed_ssh_mount()), "JOSUI_SSH_CMD": "ssh-that-is-not-installed"}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("there is no ssh-that-is-not-installed in this image", result.stderr)
+        self.assertFalse((self.home / ".ssh").exists())
+
     def test_a_bypass_acceptance_survives_a_restart(self) -> None:
         self.assertEqual(self.run_entrypoint().returncode, 0)
         settings = self.home / ".claude/settings.json"

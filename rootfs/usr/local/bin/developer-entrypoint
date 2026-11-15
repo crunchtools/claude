@@ -55,6 +55,62 @@ with open(path, "w") as handle:
     json.dump(settings, handle, indent=2)
 ' "$claude_dir/settings.json" || log "could not keep the Bypass Permissions acceptance"
 fi
+
+# ssh for a Dolza admin seat (constitution 3.0.0). The image supplies the
+# mechanism only; whether a seat gets ssh is the unit's call: it mounts the
+# seat's own key, with the shared config and known_hosts, at $JOSUI_SSH_DIR.
+# With nothing mounted -- every Exedore seat, a laptop copy -- this does
+# nothing.
+#
+# The identity is copied to tmpfs, never into the $HOME volume, and ~/.ssh
+# points there. Revoking a seat is removing its mount (and its
+# authorized_keys lines): a key copied into $HOME would outlive both.
+install_ssh_identity() {
+  local src=${JOSUI_SSH_DIR:-$config_dir/ssh}
+  local runtime=${JOSUI_SSH_RUNTIME:-/tmp/josui-ssh}
+  local ssh=${JOSUI_SSH_CMD:-ssh} name
+  [ -d "$src" ] || return 0
+  if ! command -v "$ssh" > /dev/null 2>&1; then
+    log "$src is mounted but there is no $ssh in this image"
+    return 0
+  fi
+  if ! [ -f "$src/id_ed25519" ]; then
+    log "$src has no private key, so ssh has no identity"
+    return 0
+  fi
+  if ! mkdir -p "$runtime" 2>/dev/null || ! chmod 0700 "$runtime"; then
+    log "cannot create $runtime; ssh identity NOT installed"
+    return 0
+  fi
+  # The guarantee is tmpfs and not $HOME, so it is checked, not assumed: an
+  # override that lands on a volume would keep the key past a revocation.
+  local fstype real_runtime real_home
+  fstype=$(stat -f -c %T "$runtime" 2>/dev/null)
+  real_runtime=$(realpath "$runtime") real_home=$(realpath "$HOME")
+  if [ "$fstype" != tmpfs ] || [ "${real_runtime#"$real_home"/}" != "$real_runtime" ] \
+      || [ "$real_runtime" = "$real_home" ]; then
+    log "$runtime is not tmpfs outside \$HOME ($fstype); ssh identity NOT installed"
+    rmdir "$runtime" 2>/dev/null
+    return 0
+  fi
+  # Copied, not pointed at: ssh refuses a private key that anyone else can
+  # read, and the mode on a bind mount is whatever the host set.
+  for name in id_ed25519 config known_hosts; do
+    [ -f "$src/$name" ] || continue
+    install -m 0600 "$src/$name" "$runtime/$name"
+  done
+  # A real ~/.ssh from an earlier image is kept, renamed, not deleted.
+  if [ -e "$HOME/.ssh" ] && ! [ -L "$HOME/.ssh" ]; then
+    mv "$HOME/.ssh" "$HOME/.ssh.before-tmpfs.$(date +%s)"
+  fi
+  ln -sfn "$runtime" "$HOME/.ssh"
+  if ! [ -f "$runtime/known_hosts" ]; then
+    log "$src has no known_hosts, so the first connection will have nothing to verify against"
+  fi
+  log "ssh identity installed from $src"
+}
+
+install_ssh_identity
 # Only the image's managed hooks run (allowManagedHooksOnly), so a hook in
 # this home, written by the agent or planted by a checkout, does nothing.
 # Clear the old copies so nobody mistakes them for live ones.
