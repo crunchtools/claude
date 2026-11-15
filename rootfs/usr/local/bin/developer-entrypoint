@@ -78,8 +78,10 @@ install_ssh_identity() {
     log "$src has no private key, so ssh has no identity"
     return 0
   fi
-  mkdir -p "$runtime"
-  chmod 0700 "$runtime"
+  if ! mkdir -p "$runtime" 2>/dev/null || ! chmod 0700 "$runtime"; then
+    log "cannot create $runtime; ssh identity NOT installed"
+    return 0
+  fi
   # The guarantee is tmpfs and not $HOME, so it is checked, not assumed: an
   # override that lands on a volume would keep the key past a revocation.
   local fstype real_runtime real_home

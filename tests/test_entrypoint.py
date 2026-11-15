@@ -626,6 +626,14 @@ class EntrypointTest(unittest.TestCase):
         self.ssh_runtime = runtime
         return {**self.env, "JOSUI_SSH_DIR": str(src), "JOSUI_SSH_RUNTIME": str(runtime)}
 
+    def test_a_runtime_that_cannot_be_created_is_reported_not_fatal(self) -> None:
+        self.fake_ssh()
+        blocker = self.root / "blocker"
+        blocker.write_text("a file, not a directory\n")
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=blocker / "ssh"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("NOT installed", result.stderr)
+
     def test_a_runtime_under_home_is_refused(self) -> None:
         self.fake_ssh()
         result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=self.home / "keys"))
@@ -634,10 +642,9 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(list(self.home.rglob("id_ed25519")), [])
 
     def test_a_runtime_that_is_not_tmpfs_is_refused(self) -> None:
-        disk = Path(__file__).resolve().parent / ".ssh-runtime-test"
-        if subprocess.run(["stat", "-f", "-c", "%T", str(disk.parent)], capture_output=True, text=True).stdout.strip() == "tmpfs":
-            self.skipTest("the checkout itself is on tmpfs")
-        self.addCleanup(shutil.rmtree, disk, True)
+        disk = self.root / "disk-ssh"
+        if subprocess.run(["stat", "-f", "-c", "%T", str(self.root)], capture_output=True, text=True).stdout.strip() == "tmpfs":
+            self.skipTest("the scratch directory is itself on tmpfs here")
         self.fake_ssh()
         result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=disk))
         self.assertIn("NOT installed", result.stderr)
