@@ -80,6 +80,17 @@ install_ssh_identity() {
   fi
   mkdir -p "$runtime"
   chmod 0700 "$runtime"
+  # The guarantee is tmpfs and not $HOME, so it is checked, not assumed: an
+  # override that lands on a volume would keep the key past a revocation.
+  local fstype real_runtime real_home
+  fstype=$(stat -f -c %T "$runtime" 2>/dev/null)
+  real_runtime=$(realpath "$runtime") real_home=$(realpath "$HOME")
+  if [ "$fstype" != tmpfs ] || [ "${real_runtime#"$real_home"/}" != "$real_runtime" ] \
+      || [ "$real_runtime" = "$real_home" ]; then
+    log "$runtime is not tmpfs outside \$HOME ($fstype); ssh identity NOT installed"
+    rmdir "$runtime" 2>/dev/null
+    return 0
+  fi
   # Copied, not pointed at: ssh refuses a private key that anyone else can
   # read, and the mode on a bind mount is whatever the host set.
   for name in id_ed25519 config known_hosts; do

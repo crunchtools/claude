@@ -617,8 +617,31 @@ class EntrypointTest(unittest.TestCase):
             (src / "known_hosts").write_text("gloval ssh-ed25519 AAAA\n")
         return src
 
-    def ssh_env(self, src: Path) -> dict[str, str]:
-        return {**self.env, "JOSUI_SSH_DIR": str(src), "JOSUI_SSH_RUNTIME": str(self.root / "tmpfs-ssh")}
+    def ssh_env(self, src: Path, runtime: Path | None = None) -> dict[str, str]:
+        if runtime is None:
+            # /dev/shm is tmpfs on every Linux, CI runners included.
+            shm = tempfile.mkdtemp(dir="/dev/shm")
+            self.addCleanup(shutil.rmtree, shm, True)
+            runtime = Path(shm) / "tmpfs-ssh"
+        self.ssh_runtime = runtime
+        return {**self.env, "JOSUI_SSH_DIR": str(src), "JOSUI_SSH_RUNTIME": str(runtime)}
+
+    def test_a_runtime_under_home_is_refused(self) -> None:
+        self.fake_ssh()
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=self.home / "keys"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("NOT installed", result.stderr)
+        self.assertEqual(list(self.home.rglob("id_ed25519")), [])
+
+    def test_a_runtime_that_is_not_tmpfs_is_refused(self) -> None:
+        disk = Path(__file__).resolve().parent / ".ssh-runtime-test"
+        if subprocess.run(["stat", "-f", "-c", "%T", str(disk.parent)], capture_output=True, text=True).stdout.strip() == "tmpfs":
+            self.skipTest("the checkout itself is on tmpfs")
+        self.addCleanup(shutil.rmtree, disk, True)
+        self.fake_ssh()
+        result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=disk))
+        self.assertIn("NOT installed", result.stderr)
+        self.assertFalse((disk / "id_ed25519").exists())
 
     def test_no_ssh_identity_unless_one_is_mounted(self) -> None:
         self.fake_ssh()
@@ -630,7 +653,7 @@ class EntrypointTest(unittest.TestCase):
         self.fake_ssh()
         result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount()))
         self.assertEqual(result.returncode, 0, result.stderr)
-        runtime = self.root / "tmpfs-ssh"
+        runtime = self.ssh_runtime
         self.assertEqual(stat.S_IMODE(runtime.stat().st_mode), 0o700)
         for name in ("id_ed25519", "config", "known_hosts"):
             self.assertEqual(stat.S_IMODE((runtime / name).stat().st_mode), 0o600, name)
