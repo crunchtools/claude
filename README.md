@@ -76,8 +76,16 @@ acceptance of the Bypass Permissions warning (`skipDangerousModePermissionPrompt
 in `~/.claude/settings.json`) is carried over when the mounted `settings.json`
 replaces the old one. The entrypoint keeps an acceptance but never gives one.
 
-Prime holds no ssh key. Like every seat, it reaches other hosts only through
-the gateway's host tools (autonomous-agent profile: no direct egress).
+## ssh (Dolza admin seats)
+
+Every container on Dolza -- Prime, Dolza (Vertex) 1-4, Dolza (Max) 1-4 -- has
+its own ssh key to Breetai, Gloval, Dolza and Exedore (constitution 3.0.0).
+The unit mounts the seat's key with the shared ssh config and known_hosts at
+`JOSUI_SSH_DIR`; the entrypoint copies them to tmpfs (`JOSUI_SSH_RUNTIME`,
+default `/tmp/josui-ssh`) and links `~/.ssh` there, so no key is ever written
+to the `$HOME` volume. `ssh gloval`, `ssh exedore`, `ssh dolza`, `ssh breetai`
+then work. Exedore's seats mount nothing and get nothing. Keys are granted and
+revoked per seat with josui's `tools/seat-ssh/grant` and `revoke`.
 
 ## Running a repository's own gates
 

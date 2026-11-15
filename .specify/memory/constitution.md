@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 2.0.0
+> **Version:** 3.0.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.41.0
@@ -8,19 +8,29 @@
 
 Claude Code packaged as a container image for crunchtools agents. The image is
 tooling; the role an instance plays is set by its unit: what is mounted, which
-gateway profile its token belongs to, and its environment. Two roles run it:
+gateway profile its token belongs to, and its environment. Three roles run it:
 
 - **Josui Prime** — one instance, on dolza. The dispatcher that OPERATES the
   fleet: Prime's identity and state, the operator profile on dolza's gateway,
   and the owner's texts (RCS through Matrix, `JOSUI_MATRIX_HOMESERVER`). It
   carries none of the nested-engine deviations below and keeps its SELinux
   label.
-- **Workers** — Vertex 1-4 on dolza and Max 1-4 on exedore, which BUILD it.
-  The rest of this document, unless it names Prime, is about them.
+- **Dolza admin seats** — Dolza (Vertex) 1-4 and Dolza (Max) 1-4, in the
+  agents pod with Prime. Workers that also administer: each has its own ssh
+  key to Breetai, Gloval, Dolza and Exedore (root on the servers, the owner's
+  account on the user machines), mounted by its unit (`JOSUI_SSH_DIR`). The
+  owner's call (2026-11-14): Dolza is an admin box.
+- **Workers** — Exedore (Max) 1-4, which BUILD it, with no special access.
+  The rest of this document, unless it names Prime or the admin seats, is
+  about them.
 
-The difference between the roles is the point, and it is held by the units,
-not the image: a worker never gets Prime's identity, state, token or text
-channel. The image began as `Containerfile.dev` in that repo and
+The difference between the roles is held by the units, not the image. On
+Exedore a worker never gets Prime's identity, state, token or text channel.
+**The Dolza pod is one trust domain**: its members share a PID namespace and
+uid 1000 with SELinux labels off, so each can read another's `/proc/<pid>`
+environment and root, Prime's operator token included. Nothing in the pod is
+kept from another member of it; a boundary there needs its own pod or
+distinct uids. The image began as `Containerfile.dev` in that repo and
 inherits its entrypoint, its mount contract and its `JOSUI_*` environment
 prefix; that inheritance is a starting point, not a commitment, and renaming
 the prefix is its own change with a window where both are accepted.
@@ -222,6 +232,16 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
   production. They are what this agent is for. It is contained by having no
   production to reach, not by removing them.
 
+- **Admin seats have ssh, and with it production reach (3.0.0).** An ssh
+  session is neither judged nor audited by Trentina; sshd records the login
+  and the key's fingerprint, not the commands. Each seat's key is its own
+  (attribution, and revoking one seat leaves the rest), is copied to tmpfs and
+  never into the `$HOME` volume, and is accepted only `from=` dolza's overlay
+  address, without agent or X11 forwarding. Egress isolation is never claimed
+  for an admin seat: every host it can ssh to is a way out. Revoking a seat is
+  removing its mount and its `dolza-<seat>` authorized_keys lines
+  (josui `tools/seat-ssh/revoke`).
+
 - **Worker egress is not isolated yet (2.0.0).** On gloval the seats sat on
   an internal network with no DNS whose only other member was the gateway, and
   their HTTPS left through the gateway's client-egress allowlist; the Trust
@@ -230,7 +250,8 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
   network, so neither has that boundary today. Until it is rebuilt (an
   nftables allowlist on exedore, and the pod on an internal network routed
   through dolza's gateway), a worker's direct egress is limited only by what
-  it is asked to do. The SELinux deviation's list of compensations above names
+  it is asked to do. Since 3.0.0 the rebuild covers the Exedore workers only;
+  the Dolza admin seats are out of its scope (above). The SELinux deviation's list of compensations above names
   the internal network; for these workers that item is missing.
 
 ## Service
@@ -255,3 +276,4 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 | 1.2.0 | 2026-11-06 | `sdlc` on PATH, resolving the rev the repo pins rather than any default, so a gate run by hand is the same tool CI runs. RT#1556 |
 | 1.1.0 | 2026-11-06 | A seat's `sdlc push` prerequisites move into the image: a git identity from the environment, and tool API keys from a read-only mcp-env mount. Layer 5 now names two credentials rather than one. Measured: 293s for trentina's push tier in a seat against 416s on the laptop. RT#1556 |
 | 1.0.0 | 2026-11-06 | Extracted from josui 0.8.0, where this image was `Containerfile.dev`. Carries the measurements that justify its deviations: the five-capability set, `label=disable` with no AVC to replace it, `unmask=/proc/*`, the unprivileged UID map, and the fact that liveness is not monitorable from inside. RT#1556 |
+| 3.0.0 | 2026-11-14 | A third role, Dolza admin seats (Dolza (Vertex) 1-4, Dolza (Max) 1-4): own ssh key each to Breetai, Gloval, Dolza and Exedore, on tmpfs, `from=` dolza, revocable per seat. The Dolza pod is one trust domain. Workers are now the Exedore seats only. MAJOR because "a worker never gets production reach or Prime's token" stops being true on Dolza |
