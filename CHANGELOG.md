@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The entrypoint's usage comment names this image, not the retired
+  `quay.io/crunchtools/josui` (crunchtools/josui#71).
+
 ## [1.10.0] - 2026-11-16
 
 ### Changed
