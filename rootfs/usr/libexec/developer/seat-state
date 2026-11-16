@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Tell /agents whether this seat is busy and who is driving it.
+
+Run by Claude Code's managed hooks (40-developer-seat.json) with the event on
+stdin, and writes ~/.claude/seat-state.json:
+
+  seat-state prompt   UserPromptSubmit. A prompt a person typed marks the
+                      seat busy and manual, with the session's first prompt
+                      as its task. A cross-session message (Josui Prime's
+                      assignments) reaches this hook too, wrapped in
+                      <cross-session-message>, and changes nothing.
+  seat-state start    SessionStart. source=clear frees the seat and pins the
+                      new conversation's UUID for developer-worker-claude, so
+                      a respawn does not bring back the cleared one.
+
+A hook must never stand between a person and their prompt: every failure is
+reported on stderr and the exit is 0. Nothing goes to stdout, which
+UserPromptSubmit would add to the conversation.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+TASK_LENGTH = 120
+PEER_MARK = "<cross-session-message"
+UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def write_atomically(path: Path, text: str) -> None:
+    """Replace path in one step, through a temporary file beside it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
+def read_state(path: Path) -> dict[str, Any]:
+    try:
+        state = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    return state if isinstance(state, dict) else {}
+
+
+def now() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def on_prompt(event: dict[str, Any], state_path: Path) -> None:
+    prompt = str(event.get("prompt", ""))
+    # The wrapper opens the message, after at most a line of preface.
+    if PEER_MARK in prompt.lstrip()[:200]:
+        return
+    session = str(event.get("session_id", ""))
+    state = read_state(state_path)
+    if state.get("session_id") == session and state.get("owner") == "manual" and state.get("task"):
+        return
+    seat = {
+        "state": "busy",
+        "owner": "manual",
+        "task": prompt.strip()[:TASK_LENGTH],
+        "since": now(),
+        "session_id": session,
+    }
+    write_atomically(state_path, json.dumps(seat) + "\n")
+
+
+def on_start(event: dict[str, Any], state_path: Path, pin_path: Path) -> None:
+    if event.get("source") != "clear":
+        return
+    session = str(event.get("session_id", ""))
+    write_atomically(state_path, json.dumps({"state": "free", "since": now(), "session_id": session}) + "\n")
+    if UUID.match(session):
+        write_atomically(pin_path, session + "\n")
+    else:
+        print(f"seat-state: session id {session!r} is not a UUID, not pinned", file=sys.stderr)
+
+
+def main(argv: list[str]) -> int:
+    home = Path.home()
+    state_path = home / ".claude/seat-state.json"
+    pin_path = home / ".config/josui/session-id"
+    try:
+        event = json.load(sys.stdin)
+        if not isinstance(event, dict):
+            raise ValueError("the event is not a JSON object")
+        if argv[1:] == ["prompt"]:
+            on_prompt(event, state_path)
+        elif argv[1:] == ["start"]:
+            on_start(event, state_path, pin_path)
+        else:
+            raise ValueError(f"usage: seat-state prompt|start, not {argv[1:]}")
+    except (OSError, ValueError) as exc:
+        print(f"seat-state: {exc}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

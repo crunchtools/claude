@@ -54,6 +54,8 @@ jobs:
           bash -n /usr/local/bin/developer-entrypoint
           bash -n /usr/local/bin/developer-worker-claude
           test -x /usr/local/bin/developer-worker-claude
+          test -x /usr/libexec/developer/seat-state
+          python3 -m json.tool /etc/claude-code/managed-settings.d/40-developer-seat.json > /dev/null
         '
     secrets:
       QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}

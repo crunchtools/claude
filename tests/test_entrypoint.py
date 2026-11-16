@@ -179,6 +179,40 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(self._git(self.skills, "branch", "--show-current"), "main")
         self.assertTrue((self.home / ".claude/skills/gamma").exists())
 
+    def skills_upstream(self) -> Path:
+        upstream = self.root / "upstream"
+        (upstream / "skills/delta").mkdir(parents=True)
+        (upstream / "skills/delta/SKILL.md").write_text("delta\n")
+        self._git(upstream, "init", "-q", "-b", "main")
+        self._git(upstream, "add", "-A")
+        self._git(upstream, "commit", "-qm", "delta")
+        return upstream
+
+    # An empty skills volume (Exedore max4, #42) is cloned, not left empty.
+    def test_an_empty_skills_volume_is_cloned_and_linked(self) -> None:
+        upstream = self.skills_upstream()
+        shutil.rmtree(self.skills)
+        self.skills.mkdir()
+        result = self.run_entrypoint(env={**self.env, "JOSUI_SKILLS_URL": str(upstream)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self._git(self.skills, "branch", "--show-current"), "main")
+        self.assertEqual([p.name for p in (self.home / ".claude/skills").iterdir()], ["delta"])
+
+    def test_a_skills_clone_that_fails_is_reported_not_fatal(self) -> None:
+        shutil.rmtree(self.skills)
+        self.skills.mkdir()
+        result = self.run_entrypoint(env={**self.env, "JOSUI_SKILLS_URL": str(self.root / "no-such-repo")})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("skills clone", result.stderr)
+        self.assertEqual(list((self.home / ".claude/skills").iterdir()), [])
+
+    # A volume with files and no .git is someone's, not ours to clone over.
+    def test_a_skills_dir_that_is_not_a_checkout_is_left_alone(self) -> None:
+        upstream = self.skills_upstream()
+        self.run_entrypoint(env={**self.env, "JOSUI_SKILLS_URL": str(upstream)})
+        self.assertFalse((self.skills / ".git").exists())
+        self.assertEqual(sorted(p.name for p in (self.home / ".claude/skills").iterdir()), ["alpha", "beta"])
+
     def test_arguments_run_instead_of_remote_control(self) -> None:
         result = self.run_entrypoint("claude", "auth", "login")
         self.assertEqual(result.returncode, 0, result.stderr)
