@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-16
+
 ### Changed
 - claude-agent 1.1.0 (was 1.0.1): it holds Claude Code in tmux itself, on a
   server of its own. A texted worker (Josui Prime) no longer gets a `dev`
