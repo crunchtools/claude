@@ -541,11 +541,12 @@ start_worker_session() {
 # (`claude-agent send`) reach the same session. A second, separate text
 # session would split Prime in two, which is what the server path does.
 #
-# The supervisor draws nothing on its own stdout, so tmux window 0 runs
-# `claude-agent attach --rw` in a loop -- `tmux attach -t dev` still shows the
-# live session. 160x50 is the supervisor's fixed pty size. The supervisor is
-# the supervised pid: when Claude Code exits the container ends and the unit
-# restarts it.
+# claude-agent 1.1.0 holds Claude Code in tmux itself, on a server of its own
+# (`tmux -L claude-agent`), so a person reaches it with
+# `claude-agent attach --rw`, sized to their terminal. There is no `dev`
+# session here: run inside one, that attach would nest tmux. The supervisor
+# is the supervised pid: when Claude Code exits the container ends and the
+# unit restarts it.
 start_supervised_worker() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
   local args=(-n "$name")
@@ -560,10 +561,7 @@ start_supervised_worker() {
   args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
   claude-agent run -- "${args[@]}" &
   pids+=($!)
-  "$tmux" new-session -d -s dev -x 160 -y 50 -c "$workdir" \
-    sh -c 'while :; do claude-agent attach --rw; sleep 2; done'
-  "$tmux" new-window -d -t dev -c "$workdir" 2>/dev/null || true
-  log "worker '$name' is up under claude-agent with texting: podman exec -it <service> tmux attach -t dev"
+  log "worker '$name' is up under claude-agent with texting: podman exec -it <service> claude-agent attach --rw"
 }
 
 # The Remote Control server (or, for a worker, the tmux session holding its
