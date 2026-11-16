@@ -67,6 +67,7 @@ def now() -> str:
 
 
 def on_prompt(event: dict[str, Any], state_path: Path) -> None:
+    """UserPromptSubmit: a typed prompt makes the seat busy and manual."""
     prompt = str(event.get("prompt", ""))
     # The wrapper opens the message, after at most a line of preface.
     if PEER_MARK in prompt.lstrip()[:200]:
@@ -86,6 +87,7 @@ def on_prompt(event: dict[str, Any], state_path: Path) -> None:
 
 
 def on_start(event: dict[str, Any], state_path: Path, pin_path: Path) -> None:
+    """SessionStart: /clear frees the seat and pins the new session's UUID."""
     if event.get("source") != "clear":
         return
     session = str(event.get("session_id", ""))
