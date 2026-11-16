@@ -536,8 +536,13 @@ class EntrypointTest(unittest.TestCase):
     # Remote Control server; JOSUI_RC=1 turns Remote Control on for it.
     def worker_calls(self, **extra: str) -> tuple[subprocess.CompletedProcess[str], list[str]]:
         self.fake_tmux()
-        env = {**self.env, "JOSUI_MODE": "worker", "JOSUI_NAME": "Vertex 1",
-               "JOSUI_PERMISSION_MODE": "bypassPermissions", **extra}
+        env = {
+            **self.env,
+            "JOSUI_MODE": "worker",
+            "JOSUI_NAME": "Vertex 1",
+            "JOSUI_PERMISSION_MODE": "bypassPermissions",
+            **extra,
+        }
         result = self.run_entrypoint(env=env)
         return result, (self.home / "tmux-args").read_text().splitlines()
 
@@ -643,7 +648,12 @@ class EntrypointTest(unittest.TestCase):
 
     def test_a_runtime_that_is_not_tmpfs_is_refused(self) -> None:
         disk = self.root / "disk-ssh"
-        if subprocess.run(["stat", "-f", "-c", "%T", str(self.root)], capture_output=True, text=True).stdout.strip() == "tmpfs":
+        if (
+            subprocess.run(
+                ["stat", "-f", "-c", "%T", str(self.root)], capture_output=True, text=True
+            ).stdout.strip()
+            == "tmpfs"
+        ):
             self.skipTest("the scratch directory is itself on tmpfs here")
         self.fake_ssh()
         result = self.run_entrypoint(env=self.ssh_env(self.seed_ssh_mount(), runtime=disk))
@@ -719,7 +729,6 @@ class EntrypointTest(unittest.TestCase):
         data = json.loads((self.home / ".claude/settings.json").read_text())
         self.assertNotIn("skipDangerousModePermissionPrompt", data)
 
-
     # A worker with a homeserver is ONE session, held by claude-agent.
     def test_texted_worker_is_one_session_under_claude_agent(self) -> None:
         self.fake_tmux()
@@ -729,8 +738,16 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(result.returncode, 7, result.stderr)
         self.assertEqual(
             (self.home / "agent-args").read_text().splitlines(),
-            ["run", "--", "-n", "Josui Prime", "--remote-control", "Josui Prime",
-             "--permission-mode", "bypassPermissions"],
+            [
+                "run",
+                "--",
+                "-n",
+                "Josui Prime",
+                "--remote-control",
+                "Josui Prime",
+                "--permission-mode",
+                "bypassPermissions",
+            ],
         )
         # No Remote Control server and no second Claude Code.
         self.assertFalse((self.home / "claude-args").exists())
@@ -752,7 +769,6 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.home / "agent-ran").exists())
         self.assertIn("claude -n Vertex 1", calls[0])
-
 
     def test_texted_worker_without_remote_control_omits_it(self) -> None:
         self.fake_tmux()

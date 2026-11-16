@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-11-16
+
+### Fixed
+- `PYTEST_XDIST_AUTO_NUM_WORKERS=4` in the image. A repo with `-n auto` in its
+  pytest addopts (trentina) started 24 xdist workers on a 24-core host, ~280 MB
+  each, past the seat's memory limit; the OOM killer took the Claude session
+  with them, three times on Exedore in one night. An explicit `-n N` still wins.
+
 ## [1.9.0] - 2026-11-14
 
 ### Added
