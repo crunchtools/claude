@@ -6,11 +6,13 @@
 #
 # The conversation is pinned: a UUID made once and kept in the state volume.
 # Its transcript holds a user turn -> --resume it. Otherwise --session-id it,
-# which starts it. Claude Code exits 1 on either flag when the transcript
-# exists but holds no conversation (empty, corrupt, or only metadata), so
-# that transcript is left where it is and the seat gets a new UUID -- a pane
-# respawned into that exit would fail forever. A pane that died before its
-# first message wrote no transcript, and keeps its UUID.
+# which starts it. When the transcript exists but holds no conversation
+# (empty, corrupt, or only metadata) --resume exits 1 on the first two and
+# --session-id on all three, so that transcript is left where it is and the
+# seat gets a new UUID -- a pane respawned into that exit would fail forever.
+# A pane that died before its first message wrote no transcript, and keeps
+# its UUID. A UUID that cannot be saved is still started: this start is just
+# not resumable, which beats a pane that never starts.
 #
 # Pinned rather than `--continue`: the most recent conversation in the cwd
 # may be one someone ran by hand. Never `--resume <name>`: names repeat, and
@@ -63,8 +65,11 @@ else
 fi
 if [ -z "$session" ]; then
   session=$(python3 -c 'import uuid; print(uuid.uuid4())')
-  mkdir -p "${state%/*}"
-  printf '%s\n' "$session" > "$state.tmp"
-  mv -f "$state.tmp" "$state"
+  tmp=
+  if ! { mkdir -p "${state%/*}" && tmp=$(mktemp "$state.XXXXXX") &&
+    printf '%s\n' "$session" > "$tmp" && mv -f "$tmp" "$state"; }; then
+    [ -z "$tmp" ] || rm -f "$tmp"
+    log "could not save $session to $state; this conversation will not be resumed"
+  fi
 fi
 exec claude --session-id "$session" "$@"

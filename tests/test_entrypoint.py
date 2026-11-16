@@ -726,6 +726,18 @@ class EntrypointTest(unittest.TestCase):
         self.assertRegex(self.pinned(), r"^[0-9a-f-]{36}$")
         self.assert_fresh(args, self.pinned())
 
+    # A pin that cannot be saved must not stop the pane from starting.
+    def test_an_unwritable_state_dir_still_starts_claude(self) -> None:
+        (self.home / ".config").mkdir()
+        (self.home / ".config/josui").write_text("not a directory\n")
+        args = self.worker_claude()
+        self.assertEqual(args[0], "--session-id")
+        self.assertRegex(args[1], r"^[0-9a-f-]{36}$")
+
+    def test_saving_the_pin_leaves_no_temporary_file(self) -> None:
+        self.worker_claude()
+        self.assertEqual([p.name for p in (self.home / ".config/josui").iterdir()], ["session-id"])
+
     # Someone ran claude by hand in ~/work: its newer conversation is not the
     # seat's, with a pin or without one.
     def test_a_hand_run_conversation_is_never_taken_over(self) -> None:
