@@ -1,21 +1,70 @@
 #!/bin/bash
-# The program in a worker's tmux pane: Claude Code with the arguments the
-# entrypoint built, continuing the last conversation in this directory when
-# there is one. A fresh conversation is a fresh claude.ai Remote Control
-# entry, and the stale ones pile up on every restart.
+# The program in a worker's pane (and, through CLAUDE_AGENT_CLAUDE, the
+# texted worker's): Claude Code with the arguments the entrypoint built, in
+# the seat's one conversation. A fresh conversation is a fresh claude.ai
+# Remote Control entry, and the stale ones pile up on every restart.
 #
-# Decided here, at each launch, rather than once by the entrypoint: the
-# pane-died hook respawns this same command, and a seat whose first start
-# had no transcript must still continue after its pane is respawned.
+# The conversation is pinned: a UUID made once and kept in the state volume.
+# Its transcript holds a user turn -> --resume it. Otherwise --session-id it,
+# which starts it. Claude Code exits 1 on either flag when the transcript
+# exists but holds no conversation (empty, corrupt, or only metadata), so
+# that transcript is left where it is and the seat gets a new UUID -- a pane
+# respawned into that exit would fail forever. A pane that died before its
+# first message wrote no transcript, and keeps its UUID.
 #
-# The check is Claude Code's own project directory for the cwd (every
-# character outside [A-Za-z0-9] becomes '-'; a path longer than 200 of them
-# is hashed, matches nothing here, and starts fresh). Never `--resume
-# <name>`: names repeat, and the picker it opens hangs an unattended pane.
+# Pinned rather than `--continue`: the most recent conversation in the cwd
+# may be one someone ran by hand. Never `--resume <name>`: names repeat, and
+# the picker it opens hangs an unattended pane.
+#
+# Decided at every launch, so the pane-died hook and CLAUDE_AGENT_RESPAWN,
+# which re-run this same command, resume too. The transcript is looked for
+# in Claude Code's project directory for the physical cwd: every character
+# outside [A-Za-z0-9] becomes '-'. A path longer than 200 of those is hashed
+# by Claude Code, is never found here, and gets a new conversation each start.
 set -euo pipefail
 
-slug=$(pwd | sed 's/[^a-zA-Z0-9]/-/g')
-if compgen -G "$HOME/.claude/projects/$slug/*.jsonl" > /dev/null; then
-  exec claude --continue "$@"
+log() { echo "developer-worker-claude: $*" >&2; }
+
+state="$HOME/.config/josui/session-id"
+project="$HOME/.claude/projects/$(pwd -P | sed 's/[^a-zA-Z0-9]/-/g')"
+uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+has_user_turn() {
+  python3 - "$1" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(entry, dict) and entry.get("type") == "user":
+                sys.exit(0)
+except OSError:
+    pass
+sys.exit(1)
+PY
+}
+
+session=$(head -n 1 "$state" 2>/dev/null || true)
+if [[ $session =~ $uuid ]]; then
+  if has_user_turn "$project/$session.jsonl"; then
+    exec claude --resume "$session" "$@"
+  fi
+  if [ -e "$project/$session.jsonl" ]; then
+    log "transcript $session holds no conversation; starting a new one"
+    session=
+  fi
+else
+  session=
 fi
-exec claude "$@"
+if [ -z "$session" ]; then
+  session=$(python3 -c 'import uuid; print(uuid.uuid4())')
+  mkdir -p "${state%/*}"
+  printf '%s\n' "$session" > "$state.tmp"
+  mv -f "$state.tmp" "$state"
+fi
+exec claude --session-id "$session" "$@"

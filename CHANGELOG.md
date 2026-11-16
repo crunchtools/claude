@@ -7,15 +7,17 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
-- A worker seat (`JOSUI_MODE=worker`, no homeserver) continues its last
-  conversation in the work dir when Claude Code has a transcript for it, so a
-  restart keeps the seat's one claude.ai Remote Control entry instead of
-  adding a new one. The pane runs the new `developer-worker-claude`, which
-  decides at every launch, so a pane respawned by the pane-died hook
-  continues too. With no transcript it starts fresh, as before. The texted
-  worker (Josui Prime) gets the same: claude-agent runs the wrapper through
-  `CLAUDE_AGENT_CLAUDE`, so every start, `CLAUDE_AGENT_RESPAWN`'s included,
-  continues.
+- A worker seat (`JOSUI_MODE=worker`) keeps one conversation, and so one
+  claude.ai Remote Control entry, across restarts instead of adding a new
+  one each time. The new `developer-worker-claude` pins a session UUID in
+  `~/.config/josui/session-id`, resumes it (`--resume <uuid>`) when its
+  transcript holds a user turn, and otherwise starts it (`--session-id
+  <uuid>`). A transcript with no conversation in it (empty, corrupt, only
+  metadata), on which Claude Code exits 1, gets a new UUID rather than a
+  respawn loop. A conversation run by hand in the work dir is never taken
+  over. The tmux pane runs the wrapper; the texted worker (Josui Prime) runs
+  it through claude-agent's `CLAUDE_AGENT_CLAUDE`. It decides at every
+  launch, so the pane-died hook and `CLAUDE_AGENT_RESPAWN` resume too.
 
 ## [1.10.0] - 2026-11-16
 

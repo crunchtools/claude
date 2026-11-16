@@ -515,7 +515,7 @@ server_args+=(--remote-control-session-name-prefix "${JOSUI_NAME:-josui}")
 # seconds later by the pane-died hook -- a worker Prime cannot message is no
 # worker -- and the delay keeps one that cannot start (not logged in) from
 # spinning. The container ends only when the tmux session does.
-# developer-worker-claude continues the seat's last conversation, so a
+# developer-worker-claude resumes the seat's pinned conversation, so a
 # restart keeps its one claude.ai entry instead of adding another.
 start_worker_session() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
@@ -549,7 +549,7 @@ start_worker_session() {
 # session here: run inside one, that attach would nest tmux. The supervisor
 # is the supervised pid: when Claude Code exits the container ends and the
 # unit restarts it. CLAUDE_AGENT_CLAUDE makes the supervisor run
-# developer-worker-claude, so this conversation is continued too -- at every
+# developer-worker-claude, so this conversation is resumed too -- at every
 # start, CLAUDE_AGENT_RESPAWN's included, not once here.
 start_supervised_worker() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}

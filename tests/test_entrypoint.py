@@ -605,9 +605,17 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(self.run_entrypoint().returncode, 0)
         self.assertFalse((self.home / "agent-ran").exists())
 
-    # developer-worker-claude, the program in a worker's pane: --continue when
-    # Claude Code has a transcript for the cwd, a fresh conversation otherwise.
-    def worker_claude(self, cwd: Path) -> list[str]:
+    # developer-worker-claude, the program in a worker's pane. It pins one
+    # session UUID per seat in ~/.config/josui/session-id: --resume it when its
+    # transcript holds a user turn, else --session-id (a fresh conversation).
+    # Claude Code refuses both flags, exit 1, on a transcript with no
+    # conversation in it, so such a transcript gets a new UUID instead.
+    SEAT_ARGS = ("-n", "Max 1", "--remote-control", "Max 1", "--permission-mode", "bypassPermissions")
+    PINNED = "0c9e5d2a-6f1b-4c7e-9a3d-2b8f4e6a1c55"
+    USER_TURN = '{"type":"user","message":{"role":"user","content":"hi"}}\n'
+
+    def worker_claude(self, cwd: Path | None = None) -> list[str]:
+        cwd = cwd or self.home / "work"
         cwd.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
             [
@@ -628,28 +636,30 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return (self.home / "claude-args").read_text().splitlines()
 
-    def transcripts(self, cwd: Path) -> Path:
+    def pin(self, session: str = PINNED) -> None:
+        state = self.home / ".config/josui"
+        state.mkdir(parents=True, exist_ok=True)
+        (state / "session-id").write_text(session + "\n")
+
+    def pinned(self) -> str:
+        return (self.home / ".config/josui/session-id").read_text().strip()
+
+    def transcript(self, session: str = PINNED, cwd: Path | None = None) -> Path:
+        cwd = (cwd or self.home / "work").resolve()
         project = (
             self.home
             / ".claude/projects"
             / "".join(c if c.isascii() and c.isalnum() else "-" for c in str(cwd))
         )
-        project.mkdir(parents=True)
-        return project
+        project.mkdir(parents=True, exist_ok=True)
+        return project / f"{session}.jsonl"
 
-    def test_worker_with_no_transcript_starts_a_fresh_conversation(self) -> None:
-        args = self.worker_claude(self.home / "work")
-        self.assertEqual(
-            args, ["-n", "Max 1", "--remote-control", "Max 1", "--permission-mode", "bypassPermissions"]
-        )
-
-    def test_worker_with_a_transcript_continues_it_under_the_same_name(self) -> None:
-        (self.transcripts(self.home / "work") / "0c9e.jsonl").write_text("{}\n")
-        args = self.worker_claude(self.home / "work")
+    def assert_fresh(self, args: list[str], session: str) -> None:
         self.assertEqual(
             args,
             [
-                "--continue",
+                "--session-id",
+                session,
                 "-n",
                 "Max 1",
                 "--remote-control",
@@ -658,23 +668,91 @@ class EntrypointTest(unittest.TestCase):
                 "bypassPermissions",
             ],
         )
-        self.assertNotIn("--resume", args)
 
-    def test_a_transcript_for_another_directory_is_not_continued(self) -> None:
-        (self.transcripts(self.home / "elsewhere") / "0c9e.jsonl").write_text("{}\n")
-        self.assertNotIn("--continue", self.worker_claude(self.home / "work"))
+    def test_a_first_start_pins_a_new_session_and_starts_it(self) -> None:
+        args = self.worker_claude()
+        session = self.pinned()
+        self.assertRegex(session, r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+        self.assert_fresh(args, session)
 
-    def test_a_project_dir_without_a_transcript_is_not_continued(self) -> None:
-        project = self.transcripts(self.home / "work")
-        (project / "0c9e").mkdir()
-        (project / "0c9e/subagent.jsonl").write_text("{}\n")
-        (project / "notes.txt").write_text("\n")
-        self.assertNotIn("--continue", self.worker_claude(self.home / "work"))
+    def test_the_pinned_session_is_resumed_under_the_same_name(self) -> None:
+        self.pin()
+        self.transcript().write_text('{"type":"mode"}\n' + self.USER_TURN)
+        self.assertEqual(
+            self.worker_claude(),
+            [
+                "--resume",
+                self.PINNED,
+                "-n",
+                "Max 1",
+                "--remote-control",
+                "Max 1",
+                "--permission-mode",
+                "bypassPermissions",
+            ],
+        )
+
+    # A pane that died before its first message wrote no transcript: the same
+    # UUID is still free, and kept.
+    def test_a_pinned_session_with_no_transcript_yet_is_started_again(self) -> None:
+        self.pin()
+        self.assert_fresh(self.worker_claude(), self.PINNED)
+        self.assertEqual(self.pinned(), self.PINNED)
+
+    def test_an_empty_transcript_gets_a_new_session(self) -> None:
+        self.pin()
+        self.transcript().write_text("")
+        args = self.worker_claude()
+        self.assertNotEqual(self.pinned(), self.PINNED)
+        self.assert_fresh(args, self.pinned())
+
+    def test_a_corrupt_transcript_gets_a_new_session(self) -> None:
+        self.pin()
+        self.transcript().write_text('not json{\n{"type":"user"\n')
+        args = self.worker_claude()
+        self.assertNotEqual(self.pinned(), self.PINNED)
+        self.assert_fresh(args, self.pinned())
+
+    def test_a_transcript_with_no_user_turn_gets_a_new_session(self) -> None:
+        self.pin()
+        self.transcript().write_text('{"type":"custom-title","customTitle":"Max 1"}\n')
+        args = self.worker_claude()
+        self.assertNotEqual(self.pinned(), self.PINNED)
+        self.assert_fresh(args, self.pinned())
+
+    def test_a_garbled_pin_is_replaced(self) -> None:
+        self.pin("../../etc/passwd")
+        args = self.worker_claude()
+        self.assertRegex(self.pinned(), r"^[0-9a-f-]{36}$")
+        self.assert_fresh(args, self.pinned())
+
+    # Someone ran claude by hand in ~/work: its newer conversation is not the
+    # seat's, with a pin or without one.
+    def test_a_hand_run_conversation_is_never_taken_over(self) -> None:
+        hand_run = "11111111-2222-4333-8444-555555555555"
+        self.transcript(hand_run).write_text(self.USER_TURN)
+        args = self.worker_claude()
+        self.assertNotIn(hand_run, args)
+        self.assertNotIn("--continue", args)
+        self.pin()
+        self.transcript().write_text(self.USER_TURN)
+        self.assertEqual(self.worker_claude()[:2], ["--resume", self.PINNED])
+
+    # Claude Code files a transcript under the physical cwd.
+    def test_a_symlinked_cwd_finds_the_transcript_under_its_target(self) -> None:
+        real = self.root / "real-work"
+        real.mkdir()
+        link = self.home / "work"
+        link.symlink_to(real)
+        self.pin()
+        self.transcript(cwd=real).write_text(self.USER_TURN)
+        self.assertEqual(self.worker_claude(link)[:2], ["--resume", self.PINNED])
 
     def test_a_cwd_with_punctuation_maps_to_claude_codes_project_dir(self) -> None:
         cwd = self.home / "my_work.d"
-        (self.transcripts(cwd) / "0c9e.jsonl").write_text("{}\n")
-        self.assertEqual(self.worker_claude(cwd)[0], "--continue")
+        self.pin()
+        self.transcript(cwd=cwd).write_text(self.USER_TURN)
+        self.assertEqual(self.worker_claude(cwd)[:2], ["--resume", self.PINNED])
 
     # The Bypass Permissions acceptance lives in settings.json, which is
     # replaced from the mount at every start.
