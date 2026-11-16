@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-16
+
 ### Changed
 - A worker seat (`JOSUI_MODE=worker`) keeps one conversation, and so one
   claude.ai Remote Control entry, across restarts instead of adding a new
