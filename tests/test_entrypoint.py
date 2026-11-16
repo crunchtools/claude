@@ -18,6 +18,7 @@ import unittest
 from pathlib import Path
 
 ENTRYPOINT = Path(__file__).resolve().parent.parent / "rootfs/usr/local/bin/developer-entrypoint"
+WORKER_CLAUDE = ENTRYPOINT.with_name("developer-worker-claude")
 
 FAKE_CLAUDE = """#!/bin/bash
 printf '%s\\n' "$@" > "$HOME/claude-args"
@@ -553,7 +554,7 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             calls[0],
-            f"new-session -d -s dev -x 200 -y 50 -c {self.home / 'work'} claude -n Vertex 1 "
+            f"new-session -d -s dev -x 200 -y 50 -c {self.home / 'work'} developer-worker-claude -n Vertex 1 "
             "--permission-mode bypassPermissions",
         )
         self.assertIn("set-option -t dev remain-on-exit on", calls)
@@ -569,7 +570,10 @@ class EntrypointTest(unittest.TestCase):
 
     def test_worker_with_remote_control_names_it(self) -> None:
         _, calls = self.worker_calls(JOSUI_NAME="Max 1", JOSUI_RC="1")
-        self.assertIn("claude -n Max 1 --remote-control Max 1 --permission-mode bypassPermissions", calls[0])
+        self.assertIn(
+            "developer-worker-claude -n Max 1 --remote-control Max 1 --permission-mode bypassPermissions",
+            calls[0],
+        )
 
     def test_worker_answers_the_first_run_questions(self) -> None:
         self.worker_calls()
@@ -600,6 +604,77 @@ class EntrypointTest(unittest.TestCase):
         agent.chmod(0o755)
         self.assertEqual(self.run_entrypoint().returncode, 0)
         self.assertFalse((self.home / "agent-ran").exists())
+
+    # developer-worker-claude, the program in a worker's pane: --continue when
+    # Claude Code has a transcript for the cwd, a fresh conversation otherwise.
+    def worker_claude(self, cwd: Path) -> list[str]:
+        cwd.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            [
+                str(WORKER_CLAUDE),
+                "-n",
+                "Max 1",
+                "--remote-control",
+                "Max 1",
+                "--permission-mode",
+                "bypassPermissions",
+            ],
+            env=self.env,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return (self.home / "claude-args").read_text().splitlines()
+
+    def transcripts(self, cwd: Path) -> Path:
+        project = (
+            self.home
+            / ".claude/projects"
+            / "".join(c if c.isascii() and c.isalnum() else "-" for c in str(cwd))
+        )
+        project.mkdir(parents=True)
+        return project
+
+    def test_worker_with_no_transcript_starts_a_fresh_conversation(self) -> None:
+        args = self.worker_claude(self.home / "work")
+        self.assertEqual(
+            args, ["-n", "Max 1", "--remote-control", "Max 1", "--permission-mode", "bypassPermissions"]
+        )
+
+    def test_worker_with_a_transcript_continues_it_under_the_same_name(self) -> None:
+        (self.transcripts(self.home / "work") / "0c9e.jsonl").write_text("{}\n")
+        args = self.worker_claude(self.home / "work")
+        self.assertEqual(
+            args,
+            [
+                "--continue",
+                "-n",
+                "Max 1",
+                "--remote-control",
+                "Max 1",
+                "--permission-mode",
+                "bypassPermissions",
+            ],
+        )
+        self.assertNotIn("--resume", args)
+
+    def test_a_transcript_for_another_directory_is_not_continued(self) -> None:
+        (self.transcripts(self.home / "elsewhere") / "0c9e.jsonl").write_text("{}\n")
+        self.assertNotIn("--continue", self.worker_claude(self.home / "work"))
+
+    def test_a_project_dir_without_a_transcript_is_not_continued(self) -> None:
+        project = self.transcripts(self.home / "work")
+        (project / "0c9e").mkdir()
+        (project / "0c9e/subagent.jsonl").write_text("{}\n")
+        (project / "notes.txt").write_text("\n")
+        self.assertNotIn("--continue", self.worker_claude(self.home / "work"))
+
+    def test_a_cwd_with_punctuation_maps_to_claude_codes_project_dir(self) -> None:
+        cwd = self.home / "my_work.d"
+        (self.transcripts(cwd) / "0c9e.jsonl").write_text("{}\n")
+        self.assertEqual(self.worker_claude(cwd)[0], "--continue")
 
     # The Bypass Permissions acceptance lives in settings.json, which is
     # replaced from the mount at every start.

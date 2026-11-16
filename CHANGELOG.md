@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- A worker seat (`JOSUI_MODE=worker`, no homeserver) continues its last
+  conversation in the work dir when Claude Code has a transcript for it, so a
+  restart keeps the seat's one claude.ai Remote Control entry instead of
+  adding a new one. The pane runs the new `developer-worker-claude`, which
+  decides at every launch, so a pane respawned by the pane-died hook
+  continues too. With no transcript it starts fresh, as before. The texted
+  worker (claude-agent) path is unchanged.
+
 ## [1.10.0] - 2026-11-16
 
 ### Changed

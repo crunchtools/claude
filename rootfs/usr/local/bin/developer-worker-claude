@@ -1,0 +1,21 @@
+#!/bin/bash
+# The program in a worker's tmux pane: Claude Code with the arguments the
+# entrypoint built, continuing the last conversation in this directory when
+# there is one. A fresh conversation is a fresh claude.ai Remote Control
+# entry, and the stale ones pile up on every restart.
+#
+# Decided here, at each launch, rather than once by the entrypoint: the
+# pane-died hook respawns this same command, and a seat whose first start
+# had no transcript must still continue after its pane is respawned.
+#
+# The check is Claude Code's own project directory for the cwd (every
+# character outside [A-Za-z0-9] becomes '-'; a path longer than 200 of them
+# is hashed, matches nothing here, and starts fresh). Never `--resume
+# <name>`: names repeat, and the picker it opens hangs an unattended pane.
+set -euo pipefail
+
+slug=$(pwd | sed 's/[^a-zA-Z0-9]/-/g')
+if compgen -G "$HOME/.claude/projects/$slug/*.jsonl" > /dev/null; then
+  exec claude --continue "$@"
+fi
+exec claude "$@"
