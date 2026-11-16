@@ -113,6 +113,11 @@ and each is now either done by the entrypoint or a documented step:
 | loopback out of the proxy | `NO_PROXY` must list `127.0.0.1,localhost,::1`. podman passes `HTTP(S)_PROXY` into every nested gate container by default, so without it a test talking to its own local server is tunnelled to the gateway and refused |
 | the constitution checkout | `sdlc`'s validator runs in the gate container with `HOME=/tmp`, so the gateway's `insteadOf` rewrite does not apply and its plain clone of `crunchtools/constitution` is refused by the egress proxy. Seed it once per inherited version, through the route that does work: `git clone --depth 1 -b <tag> https://github.com/crunchtools/constitution "$(podman volume inspect crunchtools-hook-cache --format '{{.Mountpoint}}')/constitution/<tag>"` |
 
+pytest run straight in the seat (not through `sdlc`, whose gate container has
+its own CPU and memory cap) gets at most four xdist workers for `-n auto`: the
+image sets `PYTEST_XDIST_AUTO_NUM_WORKERS=4`, because one worker per host core
+outgrows the seat's memcg and the OOM killer takes Claude down with it.
+
 A gate that wants a host the gateway's allowlist does not carry fails here and
 nowhere else, and that is the design working. trentina's benchmark corpus
 (`huggingface.co`) is the known example.

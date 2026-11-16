@@ -58,7 +58,7 @@
 FROM quay.io/podman/stable@sha256:f7a17ef911a2b9b866ada8a9426a07e29a6e4f8109ef8c0e0b7010c2541b4e49
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.9.0"
+LABEL version="1.9.1"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
@@ -128,8 +128,12 @@ RUN chmod 0755 /usr/local/bin/developer-entrypoint && \
 # it does not belong in the state backup.
 # LANG: a tmux client started by `podman exec ... tmux attach` has no locale
 # otherwise, and tmux then draws every non-ASCII character as "_".
+# PYTEST_XDIST_AUTO_NUM_WORKERS: `-n auto` (trentina's addopts) otherwise
+# starts one ~280 MB worker per host core -- 24 here -- which is past the
+# seat's memcg, and the OOM killer takes the Claude session with the tests.
 ENV HOME=/home/podman \
     LANG=C.UTF-8 \
+    PYTEST_XDIST_AUTO_NUM_WORKERS=4 \
     JOSUI_CONFIG_DIR=/etc/josui \
     JOSUI_SKILLS_DIR=/var/lib/josui/josui-skills \
     CLAUDE_AGENT=1 \
