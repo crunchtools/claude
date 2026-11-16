@@ -13,7 +13,9 @@ All notable changes to this project are documented here. The format follows
   adding a new one. The pane runs the new `developer-worker-claude`, which
   decides at every launch, so a pane respawned by the pane-died hook
   continues too. With no transcript it starts fresh, as before. The texted
-  worker (claude-agent) path is unchanged.
+  worker (Josui Prime) gets the same: claude-agent runs the wrapper through
+  `CLAUDE_AGENT_CLAUDE`, so every start, `CLAUDE_AGENT_RESPAWN`'s included,
+  continues.
 
 ## [1.10.0] - 2026-11-16
 

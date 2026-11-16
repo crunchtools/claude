@@ -548,7 +548,9 @@ start_worker_session() {
 # `claude-agent attach --rw`, sized to their terminal. There is no `dev`
 # session here: run inside one, that attach would nest tmux. The supervisor
 # is the supervised pid: when Claude Code exits the container ends and the
-# unit restarts it.
+# unit restarts it. CLAUDE_AGENT_CLAUDE makes the supervisor run
+# developer-worker-claude, so this conversation is continued too -- at every
+# start, CLAUDE_AGENT_RESPAWN's included, not once here.
 start_supervised_worker() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
   local args=(-n "$name")
@@ -561,7 +563,7 @@ start_supervised_worker() {
     args+=(--remote-control "$name")
   fi
   args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
-  claude-agent run -- "${args[@]}" &
+  CLAUDE_AGENT_CLAUDE=developer-worker-claude claude-agent run -- "${args[@]}" &
   pids+=($!)
   log "worker '$name' is up under claude-agent with texting: podman exec -it <service> claude-agent attach --rw"
 }

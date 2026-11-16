@@ -829,6 +829,17 @@ class EntrypointTest(unittest.TestCase):
         self.assertIn("under claude-agent with texting", result.stderr)
         self.assertEqual(self.agent_env()["CLAUDE_AGENT_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
 
+    # The supervisor runs developer-worker-claude, so the texted worker
+    # continues its conversation at every (re)spawn as a seat does.
+    def test_texted_worker_continues_through_the_wrapper(self) -> None:
+        self.fake_tmux()
+        self.run_entrypoint(env={**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_NAME": "Josui Prime"})
+        self.assertEqual(self.agent_env()["CLAUDE_AGENT_CLAUDE"], "developer-worker-claude")
+
+    def test_text_session_beside_the_server_runs_plain_claude(self) -> None:
+        self.run_entrypoint(env=self.session_env())
+        self.assertNotIn("CLAUDE_AGENT_CLAUDE", self.agent_env())
+
     # claude-agent holds the session in tmux itself: a `dev` session running
     # its attach would nest tmux, so there is none, and the log says how in.
     def test_texted_worker_starts_no_tmux_and_says_how_to_attach(self) -> None:
@@ -846,7 +857,7 @@ class EntrypointTest(unittest.TestCase):
         result, calls = self.worker_calls()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.home / "agent-ran").exists())
-        self.assertIn("claude -n Vertex 1", calls[0])
+        self.assertIn("developer-worker-claude -n Vertex 1", calls[0])
 
     def test_texted_worker_without_remote_control_omits_it(self) -> None:
         self.fake_tmux()
