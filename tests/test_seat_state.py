@@ -86,6 +86,14 @@ class SeatStateTest(unittest.TestCase):
         self.assertEqual(self.seat()["task"], "in a new conversation")
         self.assertEqual(self.seat()["session_id"], CLEARED)
 
+    def test_a_corrupt_state_file_is_reported_and_replaced(self) -> None:
+        for broken in ("not json{", "[1, 2]"):
+            self.state.parent.mkdir(parents=True, exist_ok=True)
+            self.state.write_text(broken)
+            result = self.prompt("first thing")
+            self.assertIn("seat-state", result.stderr)
+            self.assertEqual(self.seat()["task"], "first thing")
+
     def test_a_cross_session_message_is_not_a_person(self) -> None:
         self.prompt(PEER)
         self.assertFalse(self.state.exists())
