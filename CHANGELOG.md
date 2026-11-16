@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- A worker seat (`JOSUI_MODE=worker`) keeps one conversation, and so one
+  claude.ai Remote Control entry, across restarts instead of adding a new
+  one each time. The new `developer-worker-claude` pins a session UUID in
+  `~/.config/josui/session-id`, resumes it (`--resume <uuid>`) when its
+  transcript holds a user turn, and otherwise starts it (`--session-id
+  <uuid>`). A transcript with no conversation in it (empty, corrupt, only
+  metadata), on which Claude Code exits 1, gets a new UUID rather than a
+  respawn loop. A conversation run by hand in the work dir is never taken
+  over. The tmux pane runs the wrapper; the texted worker (Josui Prime) runs
+  it through claude-agent's `CLAUDE_AGENT_CLAUDE`. It decides at every
+  launch, so the pane-died hook and `CLAUDE_AGENT_RESPAWN` resume too.
+
 ### Fixed
 - The entrypoint's usage comment names this image, not the retired
   `quay.io/crunchtools/josui` (crunchtools/josui#71).

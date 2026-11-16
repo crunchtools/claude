@@ -52,6 +52,8 @@ jobs:
           pre-commit --version
           podman --version
           bash -n /usr/local/bin/developer-entrypoint
+          bash -n /usr/local/bin/developer-worker-claude
+          test -x /usr/local/bin/developer-worker-claude
         '
     secrets:
       QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}

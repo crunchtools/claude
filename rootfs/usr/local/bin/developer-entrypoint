@@ -515,9 +515,11 @@ server_args+=(--remote-control-session-name-prefix "${JOSUI_NAME:-josui}")
 # seconds later by the pane-died hook -- a worker Prime cannot message is no
 # worker -- and the delay keeps one that cannot start (not logged in) from
 # spinning. The container ends only when the tmux session does.
+# developer-worker-claude resumes the seat's pinned conversation, so a
+# restart keeps its one claude.ai entry instead of adding another.
 start_worker_session() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
-  local args=(claude -n "$name")
+  local args=(developer-worker-claude -n "$name")
   if ! command -v "$tmux" > /dev/null 2>&1; then
     log "JOSUI_MODE=worker needs $tmux, which is not in this image"
     exit 1
@@ -546,7 +548,9 @@ start_worker_session() {
 # `claude-agent attach --rw`, sized to their terminal. There is no `dev`
 # session here: run inside one, that attach would nest tmux. The supervisor
 # is the supervised pid: when Claude Code exits the container ends and the
-# unit restarts it.
+# unit restarts it. CLAUDE_AGENT_CLAUDE makes the supervisor run
+# developer-worker-claude, so this conversation is resumed too -- at every
+# start, CLAUDE_AGENT_RESPAWN's included, not once here.
 start_supervised_worker() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
   local args=(-n "$name")
@@ -559,7 +563,7 @@ start_supervised_worker() {
     args+=(--remote-control "$name")
   fi
   args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
-  claude-agent run -- "${args[@]}" &
+  CLAUDE_AGENT_CLAUDE=developer-worker-claude claude-agent run -- "${args[@]}" &
   pids+=($!)
   log "worker '$name' is up under claude-agent with texting: podman exec -it <service> claude-agent attach --rw"
 }
