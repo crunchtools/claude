@@ -1,7 +1,7 @@
 #!/bin/bash
 # Assemble Josui's Claude Code home from what was mounted, then serve Remote
 # Control. Anything given as arguments runs instead, with the same home:
-#   podman run -it ... quay.io/crunchtools/josui claude auth login
+#   podman run -it ... quay.io/crunchtools/developer claude auth login
 set -euo pipefail
 
 config_dir=${JOSUI_CONFIG_DIR:?JOSUI_CONFIG_DIR is not set}

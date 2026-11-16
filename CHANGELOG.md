@@ -19,6 +19,10 @@ All notable changes to this project are documented here. The format follows
   it through claude-agent's `CLAUDE_AGENT_CLAUDE`. It decides at every
   launch, so the pane-died hook and `CLAUDE_AGENT_RESPAWN` resume too.
 
+### Fixed
+- The entrypoint's usage comment names this image, not the retired
+  `quay.io/crunchtools/josui` (crunchtools/josui#71).
+
 ## [1.10.0] - 2026-11-16
 
 ### Changed
