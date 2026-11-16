@@ -64,8 +64,15 @@ tmux session *is* watched: the container ends when the session does.
 
 A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-agent run`
 instead: one session that the Matrix bridge texts into, Remote Control reaches
-and `claude-agent send` prompts, with window 0 of `dev` running
-`claude-agent attach --rw` so `tmux attach` still shows it.
+and `claude-agent send` prompts. claude-agent keeps it in tmux on a server of
+its own, and there is no `dev` session; attach with
+
+```bash
+podman exec -it josui claude-agent attach --rw   # or, over ssh: claude-agent attach --rw
+```
+
+which follows your terminal's size; prefix d detaches. Leave off `--rw` to
+watch read-only. Run it outside tmux: inside one, it would nest.
 
 Josui Prime is a worker too: `JOSUI_RC=1`, `JOSUI_NAME="Josui Prime"`, with
 none of the nested-podman flags and its SELinux label kept, since it dispatches

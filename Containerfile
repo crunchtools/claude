@@ -65,7 +65,7 @@ LABEL description="developer - a crunchtools development agent: Claude Code with
 # claude-agent is tested on Josui Prime before it reaches a dev container:
 # bump both files together, by hand.
 ARG CLAUDE_CODE_VERSION=2.1.304
-ARG CLAUDE_AGENT_VERSION=1.0.1
+ARG CLAUDE_AGENT_VERSION=1.1.0
 
 USER 0
 

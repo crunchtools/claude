@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- claude-agent 1.1.0 (was 1.0.1): it holds Claude Code in tmux itself, on a
+  server of its own. A texted worker (Josui Prime) no longer gets a `dev`
+  session running `claude-agent attach --rw` in a loop, which would now nest
+  tmux; a person attaches with `podman exec -it <service> claude-agent attach
+  --rw`, and the startup line says so. Worker seats without a homeserver are
+  unchanged.
+
 ## [1.9.1] - 2026-11-16
 
 ### Fixed

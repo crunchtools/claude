@@ -751,15 +751,18 @@ class EntrypointTest(unittest.TestCase):
         )
         # No Remote Control server and no second Claude Code.
         self.assertFalse((self.home / "claude-args").exists())
-        calls = (self.home / "tmux-args").read_text().splitlines()
-        self.assertEqual(
-            calls[0],
-            f"new-session -d -s dev -x 160 -y 50 -c {self.home / 'work'} sh -c "
-            "while :; do claude-agent attach --rw; sleep 2; done",
-        )
-        self.assertNotIn("has-session -t dev", calls)
         self.assertIn("under claude-agent with texting", result.stderr)
         self.assertEqual(self.agent_env()["CLAUDE_AGENT_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
+
+    # claude-agent holds the session in tmux itself: a `dev` session running
+    # its attach would nest tmux, so there is none, and the log says how in.
+    def test_texted_worker_starts_no_tmux_and_says_how_to_attach(self) -> None:
+        self.fake_tmux()
+        env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_NAME": "Josui Prime"}
+        result = self.run_entrypoint(env=env)
+        self.assertFalse((self.home / "tmux-args").exists())
+        self.assertIn("podman exec -it <service> claude-agent attach --rw", result.stderr)
+        self.assertNotIn("tmux attach -t dev", result.stderr)
 
     def test_worker_without_a_homeserver_is_not_supervised(self) -> None:
         agent = self.root / "bin/claude-agent"
