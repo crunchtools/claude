@@ -14,6 +14,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -66,8 +67,15 @@ class EntrypointTest(unittest.TestCase):
     def run_entrypoint(
         self, *args: str, env: dict[str, str] | None = None
     ) -> subprocess.CompletedProcess[str]:
+        # A timeout, so a background sync that outlived the entrypoint fails
+        # the test instead of hanging it on the inherited pipes.
         return subprocess.run(
-            ["bash", str(ENTRYPOINT), *args], env=env or self.env, capture_output=True, text=True, check=False
+            ["bash", str(ENTRYPOINT), *args],
+            env=env or self.env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
         )
 
     def test_assembles_the_home_and_serves_remote_control(self) -> None:
@@ -187,6 +195,53 @@ class EntrypointTest(unittest.TestCase):
         self._git(upstream, "add", "-A")
         self._git(upstream, "commit", "-qm", "delta")
         return upstream
+
+    # #42: a merge reaches a running seat without a restart.
+    def test_the_background_sync_picks_up_a_skill_merged_while_running(self) -> None:
+        upstream = self.skills_upstream()
+        shutil.rmtree(self.skills)
+        self._git(self.root, "clone", "-q", str(upstream), str(self.skills))
+        # The stand-in Claude merges a skill upstream, then outlives two passes.
+        claude = self.root / "bin/claude"
+        claude.write_text(
+            FAKE_CLAUDE
+            + f"cd {upstream} && mkdir -p skills/omega && echo omega > skills/omega/SKILL.md\n"
+            + "git -c user.name=t -c user.email=t@example.com add -A >/dev/null\n"
+            + "git -c user.name=t -c user.email=t@example.com commit -qm omega\n"
+            + "sleep 3\n"
+        )
+        result = self.run_entrypoint(env={**self.env, "JOSUI_SKILLS_SYNC_INTERVAL": "1"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.home / ".claude/skills/omega").is_symlink())
+
+    def test_term_stops_the_sync_loop_with_the_entrypoint(self) -> None:
+        """The loop and its sleep must not outlive the container's main
+        process: if either did, the pipes stay open and communicate() times
+        out."""
+        claude = self.root / "bin/claude"
+        # exec, so TERM reaches the sleep itself and only a leaked loop could
+        # keep the pipes open.
+        claude.write_text(FAKE_CLAUDE + 'touch "$HOME/claude-up"\nexec sleep 60\n')
+        proc = subprocess.Popen(
+            ["bash", str(ENTRYPOINT)],
+            env={**self.env, "JOSUI_SKILLS_SYNC_INTERVAL": "600"},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.addCleanup(proc.kill)
+        for _ in range(200):
+            if (self.home / "claude-up").exists():
+                break
+            time.sleep(0.05)
+        proc.terminate()
+        proc.communicate(timeout=20)
+        self.assertIsNotNone(proc.returncode)
+
+    def test_a_bad_sync_interval_syncs_only_at_start(self) -> None:
+        result = self.run_entrypoint(env={**self.env, "JOSUI_SKILLS_SYNC_INTERVAL": "10m"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("JOSUI_SKILLS_SYNC_INTERVAL is not a whole number", result.stderr)
 
     # An empty skills volume (Exedore max4, #42) is cloned, not left empty.
     def test_an_empty_skills_volume_is_cloned_and_linked(self) -> None:

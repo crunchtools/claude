@@ -1,0 +1,146 @@
+#!/bin/bash
+# developer-skills-sync -- keep a josui-skills checkout current and linked (#42).
+#
+# developer-entrypoint runs one pass at start and then one every
+# JOSUI_SKILLS_SYNC_INTERVAL seconds (600) for as long as the seat is up, so a
+# josui-skills merge goes live without a restart. On Dolza the checkout is
+# shared: Josui Prime mounts it read-write and its passes keep it current,
+# every other seat mounts it read-only and its passes only relink. On Exedore
+# each seat has a checkout of its own and keeps it current itself.
+#
+# One pass:
+#   1. An empty directory is cloned.
+#   2. A checkout this process can write is moved to the default branch,
+#      fetched, and fast-forwarded to origin/<default>. Never merged, never
+#      reset: a checkout that has diverged is left as it is and said so, every
+#      pass, until a person looks. A checkout it cannot write is someone
+#      else's to update and is only read.
+#   3. --link DIR: DIR/skills holds one symlink per skill and DIR/templates
+#      points at the templates, so a skill merged since the last pass appears
+#      and a removed one goes. Links are changed one at a time, never cleared
+#      and rebuilt, so a running session never sees an empty skills directory.
+#   4. A checkout it can write gets one status line in .git/skills-sync.status,
+#      replaced atomically, for check_skills_sync.sh on gloval (a host timer
+#      copies it to pCloud, deploy/skills-sync-push):
+#
+#        SKILLSSYNC written=<epoch> state=<state> head=<sha> origin=<sha> drift_since=<epoch> fetched=<epoch>
+#
+#      state is current, behind, diverged or off-branch. drift_since is when
+#      HEAD was first seen differing from origin/<default>, 0 while it does
+#      not. fetched is the last fetch that worked: a checkout that can no
+#      longer reach GitHub reads as a stale fetched, never as "current".
+#
+# A failed step is reported on stderr and the pass goes on; the exit status
+# is 0 unless the arguments are wrong. The next pass tries again.
+
+set -uo pipefail
+
+usage() { echo "usage: developer-skills-sync [--link CLAUDE_DIR] SKILLS_DIR" >&2; exit 2; }
+log() { echo "skills-sync: $*" >&2; }
+
+link=
+while [ $# -gt 0 ]; do
+  case $1 in
+    --link) [ $# -ge 2 ] || usage; link=$2; shift 2 ;;
+    --) shift; break ;;
+    -*) usage ;;
+    *) break ;;
+  esac
+done
+[ $# -eq 1 ] || usage
+repo=$1
+url=${JOSUI_SKILLS_URL:-https://github.com/crunchtools/josui-skills}
+now=$(date +%s)
+fetched=
+
+if ! [ -e "$repo/.git" ] && [ -z "$(ls -A "$repo" 2>/dev/null)" ]; then
+  if git clone --quiet "$url" "$repo"; then
+    fetched=$now
+  else
+    log "skills clone of $url into $repo failed; no skills until a pass succeeds"
+  fi
+elif [ -d "$repo/.git" ] && [ -w "$repo/.git" ]; then
+  # origin/HEAD is recorded at clone time; ask the remote what it is now.
+  git -C "$repo" remote set-head origin --auto >/dev/null 2>&1 || true
+  if git -C "$repo" fetch --quiet origin; then
+    fetched=$now
+  else
+    log "fetch failed in $repo, using the checkout as it is"
+  fi
+fi
+
+default=main
+if [ -d "$repo/.git" ]; then
+  default=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) &&
+    default=${default#origin/} || default=main
+fi
+
+if [ -d "$repo/.git" ] && [ -w "$repo/.git" ]; then
+  # A volume left on a feature branch pulled that branch's upstream on every
+  # start, which never moved, so a seat ran weeks-old skills while every pull
+  # reported success. Moving fails safely on local changes it would overwrite.
+  if [ "$(git -C "$repo" branch --show-current)" != "$default" ]; then
+    git -C "$repo" checkout --quiet "$default" ||
+      log "$repo is not on $default and could not be moved there"
+  fi
+  if [ "$(git -C "$repo" branch --show-current)" = "$default" ] &&
+    git -C "$repo" rev-parse --verify --quiet "origin/$default" >/dev/null; then
+    # git says why on stderr: local commits (diverged) or local edits in the way.
+    git -C "$repo" merge --ff-only --quiet "origin/$default" ||
+      log "$repo could not be fast-forwarded to origin/$default (diverged, or local changes in the way); left as it is, nothing merged"
+  fi
+fi
+
+if [ -n "$link" ]; then
+  mkdir -p "$link/skills"
+  want=" "
+  if [ -d "$repo/skills" ]; then
+    for skill in "$repo"/skills/*/; do
+      [ -d "$skill" ] || continue
+      target=${skill%/}
+      name=$(basename "$target")
+      want+="$name "
+      [ -e "$link/skills/$name" ] && ! [ -L "$link/skills/$name" ] && continue
+      [ "$(readlink "$link/skills/$name")" = "$target" ] || ln -sfn "$target" "$link/skills/$name"
+    done
+  fi
+  for entry in "$link/skills"/*; do
+    [ -L "$entry" ] || continue
+    case $want in *" $(basename "$entry") "*) ;; *) rm -f "$entry" ;; esac
+  done
+  if [ -d "$repo/templates" ]; then
+    ln -sfn "$repo/templates" "$link/templates"
+  fi
+fi
+
+[ -d "$repo/.git" ] && [ -w "$repo/.git" ] || exit 0
+
+status_file=$repo/.git/skills-sync.status
+previous() {
+  [ -r "$status_file" ] || return 0
+  grep -m1 -oE " $1=[0-9]+" "$status_file" | cut -d= -f2
+}
+head=$(git -C "$repo" rev-parse --verify --quiet HEAD 2>/dev/null) || head=none
+origin=$(git -C "$repo" rev-parse --verify --quiet "origin/$default" 2>/dev/null) || origin=none
+if [ "$(git -C "$repo" branch --show-current)" != "$default" ]; then
+  state=off-branch
+elif [ "$head" = "$origin" ]; then
+  state=current
+elif [ "$origin" != none ] && git -C "$repo" merge-base --is-ancestor "$head" "$origin" 2>/dev/null; then
+  state=behind
+else
+  state=diverged
+fi
+if [ "$state" = current ]; then
+  drift_since=0
+else
+  drift_since=$(previous drift_since)
+  [ "${drift_since:-0}" -gt 0 ] || drift_since=$now
+fi
+[ -n "$fetched" ] || fetched=$(previous fetched)
+tmp=$(mktemp "$status_file.XXXXXX") || { log "cannot write $status_file"; exit 0; }
+printf 'SKILLSSYNC written=%s state=%s head=%s origin=%s drift_since=%s fetched=%s\n' \
+  "$now" "$state" "$head" "$origin" "$drift_since" "${fetched:-0}" > "$tmp"
+chmod 0644 "$tmp"
+mv -f "$tmp" "$status_file" || { rm -f "$tmp"; log "cannot write $status_file"; }
+exit 0

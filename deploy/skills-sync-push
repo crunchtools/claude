@@ -1,0 +1,52 @@
+#!/bin/bash
+# skills-sync-push -- copy seats' skills-sync status to pCloud for Nagios (#42).
+#
+# Usage: skills-sync-push HOST SEAT=STATUS_FILE...
+#
+# developer-skills-sync writes one status line into each checkout it keeps
+# (.git/skills-sync.status). Nagios runs only on gloval and cannot see a seat,
+# so a timer on each host runs this to copy every line to
+# $SKILLS_SYNC_REMOTE/<host>.<seat> (default pcloud:Monitoring/SkillsSync),
+# with host= and seat= put in front. check_skills_sync.sh on gloval
+# (crunchtools/nagios-agent) judges them -- the route Cold Copy Freshness
+# already takes from Exedore.
+#
+# A file that is missing or does not hold a status line is reported and
+# skipped, and the exit is 1. Nothing is deleted on pCloud: the old marker
+# goes stale, which the check reports as a dead sync.
+
+set -uo pipefail
+
+usage() { echo "usage: skills-sync-push HOST SEAT=STATUS_FILE..." >&2; exit 2; }
+log() { echo "skills-sync-push: $*" >&2; }
+
+remote=${SKILLS_SYNC_REMOTE:-pcloud:Monitoring/SkillsSync}
+rclone=${RCLONE:-rclone}
+name='^[a-z0-9][a-z0-9-]*$'
+
+[ $# -ge 2 ] || usage
+host=$1
+shift
+[[ $host =~ $name ]] || usage
+
+rc=0
+for pair in "$@"; do
+  seat=${pair%%=*}
+  file=${pair#*=}
+  if [ "$seat" = "$pair" ] || ! [[ $seat =~ $name ]]; then
+    usage
+  fi
+  # One line of key=value words and nothing else crosses to pCloud.
+  line=$(head -n1 "$file" 2>/dev/null)
+  if ! [[ $line =~ ^SKILLSSYNC(\ [a-z_]+=[A-Za-z0-9-]+)+$ ]]; then
+    log "$seat: no status line in $file"
+    rc=1
+    continue
+  fi
+  if ! printf 'SKILLSSYNC host=%s seat=%s %s\n' "$host" "$seat" "${line#SKILLSSYNC }" |
+    "$rclone" rcat "$remote/$host.$seat"; then
+    log "$seat: copying the status to $remote failed"
+    rc=1
+  fi
+done
+exit "$rc"

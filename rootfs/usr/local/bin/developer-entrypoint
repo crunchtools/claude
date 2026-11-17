@@ -143,41 +143,13 @@ if [ -n "$git_url" ] && [ -n "${TRENTINA_MCP_TOKEN:-}" ]; then
   git config --global --get-all include.path | grep -qxF "$gitconf" ||
     git config --global --add include.path "$gitconf"
 fi
-# Skills are a git checkout on a volume. A failed pull is not fatal: the
-# checkout that is there still works, and the network may be the thing down.
-#
-# The seat runs the default branch, whatever the volume was seeded with. A
-# volume left on a feature branch pulled that branch's upstream on every
-# start, which never moved, so a seat ran weeks-old skills while every pull
-# reported success. Moving fails safely on local changes it would overwrite,
-# and says so.
-#
-# An empty volume is cloned (#42: one seat's had never been seeded, so it ran
-# with no skills at all). A directory with files and no .git is left alone.
-skills_url=${JOSUI_SKILLS_URL:-https://github.com/crunchtools/josui-skills}
-if ! [ -e "$skills_repo/.git" ] && [ -z "$(ls -A "$skills_repo" 2>/dev/null)" ]; then
-  git clone --quiet "$skills_url" "$skills_repo" ||
-    log "skills clone failed; starting with no skills"
-elif [ -d "$skills_repo/.git" ]; then
-  # origin/HEAD is recorded at clone time; ask the remote what it is now.
-  git -C "$skills_repo" remote set-head origin --auto >/dev/null 2>&1 || true
-  default=$(git -C "$skills_repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) &&
-    default=${default#origin/} || default=main
-  if [ "$(git -C "$skills_repo" branch --show-current)" != "$default" ]; then
-    git -C "$skills_repo" checkout --quiet "$default" ||
-      log "skills checkout is not on $default and could not be moved there"
-  fi
-  git -C "$skills_repo" pull --ff-only --quiet || log "skills pull failed, using the checkout as it is"
-fi
-find "$claude_dir/skills" -mindepth 1 -maxdepth 1 -type l -delete
-if [ -d "$skills_repo/skills" ]; then
-  for skill in "$skills_repo"/skills/*/; do
-    ln -s "${skill%/}" "$claude_dir/skills/$(basename "$skill")"
-  done
-fi
-if [ -d "$skills_repo/templates" ]; then
-  ln -sfn "$skills_repo/templates" "$claude_dir/templates"
-fi
+# Skills are a git checkout on a volume, kept current by developer-skills-sync
+# (#42): one pass now, then one every JOSUI_SKILLS_SYNC_INTERVAL seconds in
+# the background (sync_loop, below), so a josui-skills merge goes live without
+# a restart. A failed pass is not fatal: the checkout that is there still
+# works, and the network may be the thing down.
+skills_sync=("$(dirname "$(readlink -f "$0")")/developer-skills-sync" --link "$claude_dir" "$skills_repo")
+"${skills_sync[@]}"
 
 # Claude Code's state file is JSON holding things only it knows about, so it
 # is edited by merging rather than rewritten. python3 and not `jq`: jq is not
@@ -575,6 +547,30 @@ start_supervised_worker() {
   log "worker '$name' is up under claude-agent with texting: podman exec -it <service> claude-agent attach --rw"
 }
 
+# The periodic skills pass. Not a supervised pid: a sync that dies must not
+# take the seat down with it. It is stopped with the rest at exit, and its
+# sleep with it, so nothing outlives the container's main process.
+sync_loop() {
+  # jobs -p, not a remembered pid: a TERM that lands between starting the
+  # sleep and recording it would otherwise leave the sleep behind.
+  trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM
+  while :; do
+    sleep "$skills_interval" &
+    wait $!
+    "${skills_sync[@]}"
+  done
+}
+skills_interval=${JOSUI_SKILLS_SYNC_INTERVAL:-600}
+sync_pid=
+if [[ $skills_interval =~ ^[1-9][0-9]*$ ]]; then
+  sync_loop &
+  sync_pid=$!
+  # Every way out, an early `exit 1` included, stops it.
+  trap 'kill "$sync_pid" 2>/dev/null || true' EXIT
+elif [ "$skills_interval" != 0 ]; then
+  log "JOSUI_SKILLS_SYNC_INTERVAL is not a whole number of seconds; skills sync only at start"
+fi
+
 # The Remote Control server (or, for a worker, the tmux session holding its
 # one conversation) and -- when a homeserver is configured -- claude-agent,
 # side by side. When either ends the container ends, and the unit restarts
@@ -601,10 +597,10 @@ fi
 if [ -n "${JOSUI_TMUX:-}" ] && [ "${JOSUI_MODE:-server}" != worker ]; then
   start_tmux_session
 fi
-trap 'kill "${pids[@]}" 2>/dev/null' TERM INT
+trap 'kill "${pids[@]}" $sync_pid 2>/dev/null' TERM INT
 status=0
 wait -n "${pids[@]}" || status=$?
 log "a supervised process ended (status $status), stopping"
-kill "${pids[@]}" 2>/dev/null || true
+kill "${pids[@]}" $sync_pid 2>/dev/null || true
 wait || true
 exit "$status"

@@ -122,6 +122,7 @@ RUN mkdir -p /etc/josui /var/lib/josui/josui-skills /var/log/josui && \
 COPY rootfs/ /
 
 RUN chmod 0755 /usr/local/bin/developer-entrypoint /usr/local/bin/developer-worker-claude \
+        /usr/local/bin/developer-skills-sync \
         /usr/libexec/developer/seat-state && \
     bash -n /usr/local/bin/developer-entrypoint
 
