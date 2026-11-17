@@ -551,6 +551,9 @@ start_supervised_worker() {
 # take the seat down with it. It is stopped with the rest at exit, and its
 # sleep with it, so nothing outlives the container's main process.
 sync_loop() {
+  # Not set -e: a sleep killed from outside makes `wait` fail, and that must
+  # start the next pass early, not end the loop without a word.
+  set +e
   # jobs -p, not a remembered pid: a TERM that lands between starting the
   # sleep and recording it would otherwise leave the sleep behind.
   trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM

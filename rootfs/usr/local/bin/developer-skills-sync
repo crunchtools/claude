@@ -85,9 +85,12 @@ if [ -d "$repo/.git" ] && [ -w "$repo/.git" ]; then
   fi
   if [ "$(git -C "$repo" branch --show-current)" = "$default" ] &&
     git -C "$repo" rev-parse --verify --quiet "origin/$default" >/dev/null; then
-    # git says why on stderr: local commits (diverged) or local edits in the way.
-    git -C "$repo" merge --ff-only --quiet "origin/$default" ||
-      log "$repo could not be fast-forwarded to origin/$default (diverged, or local changes in the way); left as it is, nothing merged"
+    # One line per pass, with git's own reason (local commits, or local edits
+    # in the way), not its multi-line hint block every ten minutes.
+    if ! why=$(git -C "$repo" merge --ff-only --quiet "origin/$default" 2>&1); then
+      why=$(grep -m1 -E '^(fatal|error):' <<<"$why")
+      log "$repo could not be fast-forwarded to origin/$default; left as it is, nothing merged${why:+ ($why)}"
+    fi
   fi
 fi
 

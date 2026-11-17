@@ -100,8 +100,11 @@ class SkillsSyncTest(unittest.TestCase):
         since = status_of(self.repo)["drift_since"]
         second = self.sync()
 
-        self.assertIn("diverged", first.stderr)
-        self.assertIn("diverged", second.stderr)
+        self.assertIn("could not be fast-forwarded", first.stderr)
+        self.assertIn("could not be fast-forwarded", second.stderr)
+        # One line a pass, with git's reason, and none of its hint block.
+        self.assertEqual(len(first.stderr.strip().splitlines()), 1, first.stderr)
+        self.assertNotIn("hint:", first.stderr)
         self.assertEqual(self.git(self.repo, "rev-parse", "HEAD"), local)
         self.assertEqual(status_of(self.repo)["state"], "diverged")
         self.assertGreater(int(since), 0)

@@ -30,6 +30,21 @@ pwd > "$HOME/claude-cwd"
 """
 
 
+# Shell for a stand-in Claude: SIGKILL the sleep of every other child of the
+# entrypoint (the sync loop), as something outside the seat might.
+KILL_LOOP_SLEEP = r"""for f in /proc/[0-9]*/stat; do
+  read -r pid comm _ ppid _ < "$f" 2>/dev/null && echo "$pid $comm $ppid"
+done > "$HOME/ps"
+loops=" "
+while read -r pid comm ppid; do
+  [ "$ppid" = "$PPID" ] && [ "$pid" != "$$" ] && loops+="$pid "
+done < "$HOME/ps"
+while read -r pid comm ppid; do
+  case $loops in *" $ppid "*) [ "$comm" = "(sleep)" ] && kill -KILL "$pid" ;; esac
+done < "$HOME/ps"
+"""
+
+
 class EntrypointTest(unittest.TestCase):
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
@@ -213,6 +228,27 @@ class EntrypointTest(unittest.TestCase):
         result = self.run_entrypoint(env={**self.env, "JOSUI_SKILLS_SYNC_INTERVAL": "1"})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.home / ".claude/skills/omega").is_symlink())
+
+    def test_a_sync_sleep_killed_from_outside_does_not_end_the_loop(self) -> None:
+        """Under set -e the loop died silently when its sleep was killed; the
+        next pass must run instead, and pick up what was merged."""
+        upstream = self.skills_upstream()
+        shutil.rmtree(self.skills)
+        self._git(self.root, "clone", "-q", str(upstream), str(self.skills))
+        claude = self.root / "bin/claude"
+        claude.write_text(
+            FAKE_CLAUDE
+            + f"cd {upstream} && mkdir -p skills/omega && echo omega > skills/omega/SKILL.md\n"
+            + "git -c user.name=t -c user.email=t@example.com add -A >/dev/null\n"
+            + "git -c user.name=t -c user.email=t@example.com commit -qm omega\n"
+            # The loop is the entrypoint's other child; kill only its sleep.
+            # /proc and bash only: the python-sdlc image has no procps and no awk.
+            + KILL_LOOP_SLEEP
+            + "exec sleep 3\n"
+        )
+        result = self.run_entrypoint(env={**self.env, "JOSUI_SKILLS_SYNC_INTERVAL": "60"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.home / ".claude/skills/omega").is_symlink(), result.stderr)
 
     def test_term_stops_the_sync_loop_with_the_entrypoint(self) -> None:
         """The loop and its sleep must not outlive the container's main
