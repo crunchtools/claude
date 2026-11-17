@@ -122,6 +122,9 @@ def started_within(state: dict[str, Any], window: timedelta) -> bool:
         started = datetime.fromisoformat(str(state["turn_started"]))
     except (KeyError, ValueError):
         return False
+    # seat-state writes UTC with an offset; a time without one is not ours.
+    if started.tzinfo is None:
+        return False
     return datetime.now(UTC) - started < window
 
 

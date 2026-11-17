@@ -203,7 +203,8 @@ class SeatStateTest(unittest.TestCase):
     # With no usable turn_started there is no way to tell, and a seat stuck
     # active would block the clear for good.
     def test_idle_prompt_ends_a_turn_with_no_usable_start(self) -> None:
-        for started in (None, "not a time"):
+        naive = datetime.now(UTC).replace(tzinfo=None).isoformat(timespec="seconds")
+        for started in (None, "not a time", naive):
             self.prompt("first thing")
             seat = self.seat()
             if started is None:
