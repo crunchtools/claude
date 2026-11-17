@@ -34,7 +34,8 @@ All notable changes to this project are documented here. The format follows
   own reason, not git's hint block every ten minutes.
 - `deploy/`: Exedore's push timer is a system unit. Its seats run under
   root's podman and root has no linger, so a user timer would never have
-  fired. The README gives the install order.
+  fired. It reads `/etc/rclone.conf`, where Exedore keeps the `pcloud:`
+  remote, and runs sandboxed. The README gives the install order.
 
 ## [1.12.0] - 2026-11-17
 

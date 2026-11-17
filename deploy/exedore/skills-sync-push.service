@@ -4,6 +4,17 @@ Documentation=https://github.com/crunchtools/developer/tree/main/deploy
 
 [Service]
 Type=oneshot
+# root has no rclone config of its own on Exedore; /etc/rclone.conf (0600,
+# root) holds the pcloud: remote, the one ColdCopy mounts too.
+Environment=RCLONE_CONFIG=/etc/rclone.conf
+Environment=XDG_CACHE_HOME=/tmp
+# It reads the seats' status files and talks to pCloud, nothing else.
+# No ReadWritePaths: the pcloud: token never expires (expiry 0001-01-01),
+# so rclone never rewrites its config -- which is why ColdCopy mounts it :ro.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
 # A system unit: Exedore's seats run under root's podman, and root has no
 # user manager without linger. Each seat keeps its own checkout. The seat list
 # is explicit and matches the one check_skills_sync.sh expects, so a seat
