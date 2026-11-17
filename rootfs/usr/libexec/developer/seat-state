@@ -126,7 +126,7 @@ def started_within(state: dict[str, Any], window: timedelta) -> bool:
 
 
 def on_stop(event: dict[str, Any], state_path: Path) -> None:
-    """Stop, StopFailure and idle_prompt: the turn is over."""
+    """Stop and StopFailure end the turn; idle_prompt ends one older than IDLE_NOTICE_AFTER."""
     state = read_state(state_path)
     # idle_prompt also follows a turn that Stop already ended.
     if state.get("turn") == "idle":

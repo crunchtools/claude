@@ -200,6 +200,20 @@ class SeatStateTest(unittest.TestCase):
         self.idle_prompt()
         self.assertEqual(self.seat()["turn"], "active")
 
+    # With no usable turn_started there is no way to tell, and a seat stuck
+    # active would block the clear for good.
+    def test_idle_prompt_ends_a_turn_with_no_usable_start(self) -> None:
+        for started in (None, "not a time"):
+            self.prompt("first thing")
+            seat = self.seat()
+            if started is None:
+                del seat["turn_started"]
+            else:
+                seat["turn_started"] = started
+            self.state.write_text(json.dumps(seat))
+            self.idle_prompt()
+            self.assertEqual(self.seat()["turn"], "idle")
+
     def test_a_hook_waits_for_the_lock(self) -> None:
         self.state.parent.mkdir(parents=True)
         event = self.home / "event.json"
