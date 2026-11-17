@@ -157,7 +157,7 @@ fi
 skills_url=${JOSUI_SKILLS_URL:-https://github.com/crunchtools/josui-skills}
 if ! [ -e "$skills_repo/.git" ] && [ -z "$(ls -A "$skills_repo" 2>/dev/null)" ]; then
   git clone --quiet "$skills_url" "$skills_repo" ||
-    log "skills clone from $skills_url failed; starting with no skills"
+    log "skills clone failed; starting with no skills"
 elif [ -d "$skills_repo/.git" ]; then
   # origin/HEAD is recorded at clone time; ask the remote what it is now.
   git -C "$skills_repo" remote set-head origin --auto >/dev/null 2>&1 || true

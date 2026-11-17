@@ -18,7 +18,7 @@ rather than waiting for CI to render them.
 | containers | `/home/podman/.local/share/containers` | The nested engine's storage. A **cache** — exclude it from backups. |
 | identity | `/etc/josui` (read-only) | `CLAUDE.md`, `settings.json`. Says what this agent is and what it is not. |
 | tool keys | `/etc/josui/mcp-env` (read-only) | `*.env` for a gate that takes an API key. Installed to `~/.config/mcp-env` at 0600. No gate needs one today: Gatehouse goes through the gateway. A `gatehouse.env` placed here is overwritten by the entrypoint, not obeyed. |
-| skills | `/var/lib/josui/josui-skills` | A git checkout, pulled at start. |
+| skills | `/var/lib/josui/josui-skills` | A git checkout, fast-forwarded at start. An empty volume is cloned from `JOSUI_SKILLS_URL` (default `https://github.com/crunchtools/josui-skills`, through the gateway's git route). |
 | audit | `/var/log/josui` | One JSON line per tool call, plus Remote Control's debug file. |
 
 No `/srv` service tree, no production data. Repositories are cloned through the
