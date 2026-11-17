@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- seat-state records each turn (#46): every prompt, a peer's message
+  included, writes `turn: active` and `turn_started`; managed `Stop` and
+  `StopFailure` hooks write `turn: idle` and `turn_ended`. A start or resume
+  is idle too, so a seat that died mid-turn does not read active forever.
+  /agents can check the turn before it types `/clear` instead of scraping the
+  pane for a spinner.
+
 ## [1.13.0] - 2026-11-17
 
 ### Added

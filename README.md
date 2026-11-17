@@ -62,6 +62,13 @@ as answered, so the unit never stalls on a first-run question. A pane whose
 program ends is restarted ten seconds later (a `pane-died` hook). Here the
 tmux session *is* watched: the container ends when the session does.
 
+Managed hooks keep `~/.claude/seat-state.json` for Josui Prime's /agents:
+`state`, `owner` and `task` say whether the seat is busy and who drives it,
+and `turn` says whether Claude Code is in a turn right now (`active` from
+`turn_started`, `idle` from `turn_ended`). A peer's message starts a turn like
+a typed prompt does. A turn a person interrupts with Esc fires no hook and
+reads `active` until the next turn ends.
+
 A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-agent run`
 instead: one session that the Matrix bridge texts into, Remote Control reaches
 and `claude-agent send` prompts. claude-agent keeps it in tmux on a server of

@@ -4,14 +4,23 @@
 Run by Claude Code's managed hooks (40-developer-seat.json) with the event on
 stdin, and writes ~/.claude/seat-state.json:
 
-  seat-state prompt   UserPromptSubmit. A prompt a person typed marks the
-                      seat busy and manual, with the session's first prompt
-                      as its task. A cross-session message (Josui Prime's
-                      assignments) reaches this hook too, opening with
-                      <cross-session-message>, and changes nothing.
-  seat-state start    SessionStart. source=clear frees the seat and pins the
-                      new conversation's UUID for developer-worker-claude, so
-                      a respawn does not bring back the cleared one.
+  seat-state prompt   UserPromptSubmit. Every prompt starts a turn: turn is
+                      active from turn_started. A prompt a person typed also
+                      marks the seat busy and manual, with the session's
+                      first prompt as its task. A cross-session message
+                      (Josui Prime's assignments) reaches this hook too,
+                      opening with <cross-session-message>, and leaves
+                      state, owner and task alone.
+  seat-state stop     Stop and StopFailure. The turn is over: turn is idle
+                      from turn_ended. Claude Code runs neither when a person
+                      interrupts a turn, so an interrupted turn stays active
+                      until the next prompt ends or the seat restarts.
+  seat-state start    SessionStart. A new process (startup, resume) or a
+                      /clear is not mid-turn, so turn is idle. source=clear
+                      also frees the seat and pins the new conversation's
+                      UUID for developer-worker-claude, so a respawn does not
+                      bring back the cleared one. source=compact can come
+                      mid-turn and changes nothing.
 
 A hook must never stand between a person and their prompt: every failure is
 reported on stderr and the exit is 0. Nothing goes to stdout, which
@@ -66,33 +75,48 @@ def now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+def idle(state: dict[str, Any]) -> dict[str, Any]:
+    """state with the turn over as of now."""
+    return {**state, "turn": "idle", "turn_ended": now()}
+
+
 def on_prompt(event: dict[str, Any], state_path: Path) -> None:
-    """UserPromptSubmit: a typed prompt makes the seat busy and manual."""
+    """UserPromptSubmit: a turn starts; a typed prompt makes the seat busy and manual."""
     prompt = str(event.get("prompt", ""))
-    # Claude Code hands a peer's message to the hook wrapped and with nothing
-    # before it; a person who quotes the tag later in a prompt is still a person.
-    if prompt.lstrip().startswith(PEER_MARK):
-        return
     session = str(event.get("session_id", ""))
     state = read_state(state_path)
-    if state.get("session_id") == session and state.get("owner") == "manual" and state.get("task"):
-        return
-    seat = {
-        "state": "busy",
-        "owner": "manual",
-        "task": prompt.strip()[:TASK_LENGTH],
-        "since": now(),
-        "session_id": session,
-    }
+    # Claude Code hands a peer's message to the hook wrapped and with nothing
+    # before it; a person who quotes the tag later in a prompt is still a person.
+    peer = prompt.lstrip().startswith(PEER_MARK)
+    kept = state.get("session_id") == session and state.get("owner") == "manual" and state.get("task")
+    if not peer and not kept:
+        state = {
+            "state": "busy",
+            "owner": "manual",
+            "task": prompt.strip()[:TASK_LENGTH],
+            "since": now(),
+            "session_id": session,
+        }
+    state.pop("turn_ended", None)
+    seat = {**state, "turn": "active", "turn_started": now()}
     write_atomically(state_path, json.dumps(seat) + "\n")
 
 
+def on_stop(state_path: Path) -> None:
+    """Stop and StopFailure: the turn is over."""
+    write_atomically(state_path, json.dumps(idle(read_state(state_path))) + "\n")
+
+
 def on_start(event: dict[str, Any], state_path: Path, pin_path: Path) -> None:
-    """SessionStart: /clear frees the seat and pins the new session's UUID."""
-    if event.get("source") != "clear":
+    """SessionStart: no turn is running; /clear frees the seat and pins the new session's UUID."""
+    source = event.get("source")
+    if source in ("startup", "resume"):
+        write_atomically(state_path, json.dumps(idle(read_state(state_path))) + "\n")
+    if source != "clear":
         return
     session = str(event.get("session_id", ""))
-    write_atomically(state_path, json.dumps({"state": "free", "since": now(), "session_id": session}) + "\n")
+    seat = idle({"state": "free", "since": now(), "session_id": session})
+    write_atomically(state_path, json.dumps(seat) + "\n")
     if UUID.match(session):
         write_atomically(pin_path, session + "\n")
     else:
@@ -109,10 +133,12 @@ def main(argv: list[str]) -> int:
             raise ValueError("the event is not a JSON object")
         if argv[1:] == ["prompt"]:
             on_prompt(event, state_path)
+        elif argv[1:] == ["stop"]:
+            on_stop(state_path)
         elif argv[1:] == ["start"]:
             on_start(event, state_path, pin_path)
         else:
-            raise ValueError(f"usage: seat-state prompt|start, not {argv[1:]}")
+            raise ValueError(f"usage: seat-state prompt|stop|start, not {argv[1:]}")
     except (OSError, ValueError) as exc:
         print(f"seat-state: {exc}", file=sys.stderr)
     return 0
