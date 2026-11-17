@@ -51,7 +51,7 @@ class ExedoreUnitTest(unittest.TestCase):
     def test_it_pushes_every_max_seat_by_name(self) -> None:
         (exec_start,) = self.service["ExecStart"]
         words = exec_start.split()
-        self.assertEqual(words[:2], ["/usr/local/bin/skills-sync-push", "exedore"])
+        self.assertEqual(words[:2], ["/var/usrlocal/bin/skills-sync-push", "exedore"])
         self.assertEqual(
             words[2:],
             [f"max{n}=/srv/max{n}/data/josui-skills/.git/skills-sync.status" for n in range(1, 5)],
