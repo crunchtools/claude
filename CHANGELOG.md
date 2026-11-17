@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- seat-state treats a background task's result (a prompt opening with
+  `<task-notification>`) like a peer's message: the turn is active, and
+  `state`, `owner` and `task` are left alone, instead of the seat turning
+  busy/manual with the XML as its task (#61).
+- A turn interrupted with Esc no longer reads `active` until the next turn
+  ends. A managed `Notification` hook on `idle_prompt`, which Claude Code
+  sends a minute after any turn ends, interrupted ones included, runs
+  `seat-state stop`. A seat that is already idle keeps its `turn_ended`.
+
 ### Added
 - seat-state records each turn (#46): every prompt, a peer's message
   included, writes `turn: active` and `turn_started`; managed `Stop` and

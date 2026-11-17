@@ -7,14 +7,18 @@ stdin, and writes ~/.claude/seat-state.json:
   seat-state prompt   UserPromptSubmit. Every prompt starts a turn: turn is
                       active from turn_started. A prompt a person typed also
                       marks the seat busy and manual, with the session's
-                      first prompt as its task. A cross-session message
-                      (Josui Prime's assignments) reaches this hook too,
-                      opening with <cross-session-message>, and leaves
+                      first prompt as its task. Turns Claude Code starts
+                      itself reach this hook too: a cross-session message
+                      (Josui Prime's assignments) opening with
+                      <cross-session-message>, and a background task's
+                      result opening with <task-notification>. They leave
                       state, owner and task alone.
-  seat-state stop     Stop and StopFailure. The turn is over: turn is idle
-                      from turn_ended. Claude Code runs neither when a person
-                      interrupts a turn, so an interrupted turn stays active
-                      until the next prompt ends or the seat restarts.
+  seat-state stop     Stop and StopFailure, and the idle_prompt Notification.
+                      The turn is over: turn is idle from turn_ended. A turn
+                      a person interrupts with Esc runs no Stop, but its end
+                      arms the idle_prompt timer like any other, which fires
+                      a minute later unless someone types meanwhile. An idle
+                      seat keeps its first turn_ended.
   seat-state start    SessionStart. A new process (startup, resume) or a
                       /clear is not mid-turn, so turn is idle. source=clear
                       also frees the seat and pins the new conversation's
@@ -39,7 +43,8 @@ from pathlib import Path
 from typing import Any
 
 TASK_LENGTH = 120
-PEER_MARK = "<cross-session-message"
+# What Claude Code puts first in a prompt it submits on its own.
+HARNESS_MARKS = ("<cross-session-message", "<task-notification")
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
@@ -85,11 +90,11 @@ def on_prompt(event: dict[str, Any], state_path: Path) -> None:
     prompt = str(event.get("prompt", ""))
     session = str(event.get("session_id", ""))
     state = read_state(state_path)
-    # Claude Code hands a peer's message to the hook wrapped and with nothing
-    # before it; a person who quotes the tag later in a prompt is still a person.
-    peer = prompt.lstrip().startswith(PEER_MARK)
+    # Claude Code hands its own turns to the hook wrapped and with nothing
+    # before them; a person who quotes a tag later in a prompt is still a person.
+    harness = prompt.lstrip().startswith(HARNESS_MARKS)
     kept = state.get("session_id") == session and state.get("owner") == "manual" and state.get("task")
-    if not peer and not kept:
+    if not harness and not kept:
         state = {
             "state": "busy",
             "owner": "manual",
@@ -103,8 +108,12 @@ def on_prompt(event: dict[str, Any], state_path: Path) -> None:
 
 
 def on_stop(state_path: Path) -> None:
-    """Stop and StopFailure: the turn is over."""
-    write_atomically(state_path, json.dumps(idle(read_state(state_path))) + "\n")
+    """Stop, StopFailure and idle_prompt: the turn is over."""
+    state = read_state(state_path)
+    # idle_prompt also follows a turn that Stop already ended.
+    if state.get("turn") == "idle":
+        return
+    write_atomically(state_path, json.dumps(idle(state)) + "\n")
 
 
 def on_start(event: dict[str, Any], state_path: Path, pin_path: Path) -> None:

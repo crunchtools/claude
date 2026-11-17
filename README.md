@@ -65,9 +65,11 @@ tmux session *is* watched: the container ends when the session does.
 Managed hooks keep `~/.claude/seat-state.json` for Josui Prime's /agents:
 `state`, `owner` and `task` say whether the seat is busy and who drives it,
 and `turn` says whether Claude Code is in a turn right now (`active` from
-`turn_started`, `idle` from `turn_ended`). A peer's message starts a turn like
-a typed prompt does. A turn a person interrupts with Esc fires no hook and
-reads `active` until the next turn ends.
+`turn_started`, `idle` from `turn_ended`). A peer's message or a background
+task's result starts a turn like a typed prompt does, but leaves `state`,
+`owner` and `task` alone. A turn a person interrupts with Esc reads `active`
+for about a minute, until Claude Code's idle notification ends it; if someone
+types in that minute, it stays `active` until the next turn ends.
 
 A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-agent run`
 instead: one session that the Matrix bridge texts into, Remote Control reaches
