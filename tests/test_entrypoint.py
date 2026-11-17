@@ -41,7 +41,7 @@ KILL_LOOP_SLEEP = r"""killed=
 read -r self _ _ parent _ < /proc/self/stat
 for attempt in $(seq 100); do
   for f in /proc/[0-9]*/stat; do
-    read -r pid comm _ ppid _ < "$f" 2>/dev/null && echo "$pid $comm $ppid"
+    read -r pid comm _ ppid _ 2>/dev/null < "$f" && echo "$pid $comm $ppid"
   done > "$HOME/ps"
   loops=" "
   while read -r pid comm ppid; do
@@ -50,18 +50,26 @@ for attempt in $(seq 100); do
   while read -r pid comm ppid; do
     case $loops in *" $ppid "*)
       [ "$comm" = "(sleep)" ] || continue
-      # kill wants the pid in our namespace: the last NSpid field. Gone
-      # since the scan means no NSpid, and nothing is killed.
-      own=
+      # kill wants the pid in our namespace: the last NSpid field. Read it
+      # with Name and PPid from one status, and kill only if it is still the
+      # loop's sleep: gone or reused since the scan, nothing is killed.
+      own= name= pp=
       while read -r key ids; do
-        [ "$key" = NSpid: ] && own=${ids##*[[:space:]]}
+        case $key in
+          Name:) name=$ids ;;
+          PPid:) pp=$ids ;;
+          NSpid:) own=${ids##*[[:space:]]} ;;
+        esac
       done 2>/dev/null < "/proc/$pid/status"
+      [ "$name" = sleep ] || continue
+      case $loops in *" $pp "*) ;; *) continue ;; esac
       [ -n "$own" ] && kill -KILL "$own" && killed=1 ;;
     esac
   done < "$HOME/ps"
   [ -n "$killed" ] && break
   sleep 0.1
 done
+[ -n "$killed" ] || { echo "no loop sleep found" >&2; exit 1; }
 """
 
 
