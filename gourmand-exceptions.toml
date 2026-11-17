@@ -17,3 +17,15 @@ path = ".pre-commit-config.yaml"
 pattern = "ruff-check"
 justification = "ruff runs inside the sdlc-commit hook from python-sdlc (constitution XII v1.30.0), configured by [tool.ruff] in pyproject.toml; Gourmand looks for a literal ruff hook id"
 classification = "by_design"
+
+# The one test of a read-only checkout (Dolza's shared one, mounted read-only
+# into every seat but Josui Prime) makes .git mode 0555. Root writes through
+# mode bits, so as root the condition cannot be built without a privileged
+# read-only mount, which a unit test cannot make.
+[[exceptions]]
+check = "EV003-test_skip_evasion"
+path = "tests/test_skills_sync.py"
+pattern = "skipIf"
+justification = "Root ignores the 0555 mode the test uses to make a checkout unwritable, and a real read-only mount needs privileges a unit test does not have; the test runs for every non-root user."
+classification = "by_design"
+

@@ -1,0 +1,9 @@
+[Unit]
+Description=Copy the shared josui-skills sync status to pCloud for Nagios (developer#42)
+Documentation=https://github.com/crunchtools/developer/tree/main/deploy
+
+[Service]
+Type=oneshot
+# Josui Prime mounts this checkout read-write and keeps it current; every
+# other Dolza seat mounts it read-only. So there is one marker, "shared".
+ExecStart=%h/.local/bin/skills-sync-push dolza shared=%h/Projects/dolza-services/josui/data/josui-skills/.git/skills-sync.status

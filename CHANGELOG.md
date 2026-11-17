@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- A josui-skills merge reaches a running seat (#42). `developer-skills-sync`
+  runs at start, as the inline block did, and then every
+  `JOSUI_SKILLS_SYNC_INTERVAL` seconds (600) in the background: it moves the
+  checkout to the default branch, fetches, and fast-forwards. It never merges
+  or resets, so a diverged checkout is left as it is and logged every pass.
+  Skill links are updated one at a time, so a new skill appears and a removed
+  one goes without a restart, and a running session never sees an empty
+  skills directory. A checkout the seat cannot write (Dolza's shared one,
+  read-only everywhere but Josui Prime) is only relinked. The loop is not
+  supervised, so a sync that dies never takes the seat down, and it is
+  stopped at every exit.
+- Each pass over a checkout the seat can write records one `SKILLSSYNC`
+  line in `.git/skills-sync.status` (state, HEAD, origin, when the drift
+  began, the last good fetch); on Dolza that is Josui Prime's.
+  `deploy/` holds the host side: `skills-sync-push` and a 10-minute user
+  timer for Dolza and for Exedore copy those lines to
+  `pcloud:Monitoring/SkillsSync/<host>.<seat>`, where nagios-agent's
+  `check_skills_sync.sh` alerts on drift older than an hour.
+
 ## [1.12.0] - 2026-11-17
 
 ### Added
