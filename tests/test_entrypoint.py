@@ -35,17 +35,25 @@ pwd > "$HOME/claude-cwd"
 #
 # The loop may not have started its sleep yet (a loaded machine, as under
 # `sdlc pytest`), so look again until a sleep has been killed.
+# Under sdlc the nested container sees its parent's /proc, whose pids are in
+# another namespace: match on /proc's pids, then kill by our own.
 KILL_LOOP_SLEEP = r"""killed=
+read -r self _ _ parent _ < /proc/self/stat
 for attempt in $(seq 100); do
   for f in /proc/[0-9]*/stat; do
     read -r pid comm _ ppid _ < "$f" 2>/dev/null && echo "$pid $comm $ppid"
   done > "$HOME/ps"
   loops=" "
   while read -r pid comm ppid; do
-    [ "$ppid" = "$PPID" ] && [ "$pid" != "$$" ] && loops+="$pid "
+    [ "$ppid" = "$parent" ] && [ "$pid" != "$self" ] && loops+="$pid "
   done < "$HOME/ps"
   while read -r pid comm ppid; do
-    case $loops in *" $ppid "*) [ "$comm" = "(sleep)" ] && kill -KILL "$pid" && killed=1 ;; esac
+    case $loops in *" $ppid "*)
+      [ "$comm" = "(sleep)" ] || continue
+      # kill wants the pid in our namespace: the last NSpid field.
+      while read -r key ids; do [ "$key" = NSpid: ] && pid=${ids##*[[:space:]]}; done < "/proc/$pid/status"
+      kill -KILL "$pid" && killed=1 ;;
+    esac
   done < "$HOME/ps"
   [ -n "$killed" ] && break
   sleep 0.1
