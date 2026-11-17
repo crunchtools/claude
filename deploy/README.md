@@ -28,10 +28,11 @@ systemctl --user enable --now skills-sync-push.timer
 ```
 
 Exedore: system units. Its seats run under root's podman and root has no
-linger, so a root user timer would never fire.
+linger, so a root user timer would never fire. Exedore is a bootc host, so
+`/usr/local` is read-only; the script goes in `/var/usrlocal/bin`.
 
 ```bash
-install -Dm0755 deploy/skills-sync-push /usr/local/bin/skills-sync-push
+install -Dm0755 deploy/skills-sync-push /var/usrlocal/bin/skills-sync-push
 install -Dm0644 deploy/exedore/skills-sync-push.{service,timer} -t /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now skills-sync-push.timer

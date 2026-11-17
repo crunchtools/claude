@@ -19,7 +19,8 @@ ProtectHome=yes
 # user manager without linger. Each seat keeps its own checkout. The seat list
 # is explicit and matches the one check_skills_sync.sh expects, so a seat
 # dropped here is noticed there.
-ExecStart=/usr/local/bin/skills-sync-push exedore \
+# Exedore is bootc: /usr/local is read-only, /var/usrlocal is its writable twin.
+ExecStart=/var/usrlocal/bin/skills-sync-push exedore \
     max1=/srv/max1/data/josui-skills/.git/skills-sync.status \
     max2=/srv/max2/data/josui-skills/.git/skills-sync.status \
     max3=/srv/max3/data/josui-skills/.git/skills-sync.status \
