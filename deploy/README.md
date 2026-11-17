@@ -11,16 +11,32 @@ copies its seats' status lines to pCloud, where `check_skills_sync.sh`
 | Dolza | one, shared: Josui Prime mounts it read-write and syncs it, the seats mount it read-only and only relink | `dolza.shared` |
 | Exedore | one per seat, `/srv/maxN/data/josui-skills`, synced inside each seat | `exedore.max1` … `exedore.max4` |
 
-Install, as the user that runs the seats (rclone with a `pcloud:` remote is
-already on both hosts):
+Order: the seats first (an image with `developer-skills-sync`), then these
+timers, then nagios-agent's `skills-sync.conf` and services on gloval. The
+services warn "no marker" until a timer has pushed, so installing them first
+only means a known WARNING until then.
+
+rclone with a `pcloud:` remote is already on both hosts.
+
+Dolza: a user unit, as the user that runs Josui Prime and the seats.
 
 ```bash
 install -Dm0755 deploy/skills-sync-push ~/.local/bin/skills-sync-push
-install -Dm0644 deploy/<host>/skills-sync-push.{service,timer} -t ~/.config/systemd/user/
+install -Dm0644 deploy/dolza/skills-sync-push.{service,timer} -t ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now skills-sync-push.timer
 ```
 
-On Exedore, check the unit's user can read a seat's status file, which the
-seat writes 0644 from a container subuid: `head -1
-/srv/max1/data/josui-skills/.git/skills-sync.status`.
+Exedore: system units. Its seats run under root's podman and root has no
+linger, so a root user timer would never fire.
+
+```bash
+install -Dm0755 deploy/skills-sync-push /usr/local/bin/skills-sync-push
+install -Dm0644 deploy/exedore/skills-sync-push.{service,timer} -t /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now skills-sync-push.timer
+```
+
+A seat writes its status 0644 from a container subuid, and every directory on
+the way is 0755, so root (or anyone) can read it:
+`head -1 /srv/max1/data/josui-skills/.git/skills-sync.status`.

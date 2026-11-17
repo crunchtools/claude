@@ -4,9 +4,11 @@ Documentation=https://github.com/crunchtools/developer/tree/main/deploy
 
 [Service]
 Type=oneshot
-# Each seat keeps its own checkout. The seat list is explicit and matches the
-# one check_skills_sync.sh expects, so a seat dropped here is noticed there.
-ExecStart=%h/.local/bin/skills-sync-push exedore \
+# A system unit: Exedore's seats run under root's podman, and root has no
+# user manager without linger. Each seat keeps its own checkout. The seat list
+# is explicit and matches the one check_skills_sync.sh expects, so a seat
+# dropped here is noticed there.
+ExecStart=/usr/local/bin/skills-sync-push exedore \
     max1=/srv/max1/data/josui-skills/.git/skills-sync.status \
     max2=/srv/max2/data/josui-skills/.git/skills-sync.status \
     max3=/srv/max3/data/josui-skills/.git/skills-sync.status \
