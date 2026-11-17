@@ -6,19 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [1.12.0] - 2026-11-17
+## [1.13.0] - 2026-11-17
 
 ### Added
-- Seat state for /agents (#44). A managed hook writes
-  `~/.claude/seat-state.json`: a prompt a person types marks the seat busy
-  and manual, with the session's first prompt as its task; a cross-session
-  message, which reaches the same hook, changes nothing. `/clear` frees the
-  seat and pins the new conversation's UUID, so `developer-worker-claude`
-  does not resume the cleared one after a respawn.
-- Managed `autoCompactWindow: 500000`, so seats compact well before their
-  conversations get huge.
-- An empty skills volume is cloned from `crunchtools/josui-skills` at start
-  (#42); an existing checkout is fast-forwarded as before.
 - A josui-skills merge reaches a running seat (#42, #48). `developer-skills-sync`
   runs at start, as the inline block did, and then every
   `JOSUI_SKILLS_SYNC_INTERVAL` seconds (600) in the background: it moves the
@@ -44,9 +34,6 @@ All notable changes to this project are documented here. The format follows
   #30-#33.
 
 ### Fixed
-- `org.opencontainers.image.version` is this image's release, not the base
-  image's (it read 5.8.9 on 1.11.0). The boot check fails the build when it
-  and `version` disagree.
 - The background skills sync no longer ends without a word when its sleep
   is killed from outside: the loop is not under `set -e`, so the next pass
   just runs early (#49, review of #48).
@@ -56,6 +43,25 @@ All notable changes to this project are documented here. The format follows
   root's podman and root has no linger, so a user timer would never have
   fired. It reads `/etc/rclone.conf`, where Exedore keeps the `pcloud:`
   remote, and runs sandboxed. The README gives the install order (#51).
+
+## [1.12.0] - 2026-11-17
+
+### Added
+- Seat state for /agents (#44). A managed hook writes
+  `~/.claude/seat-state.json`: a prompt a person types marks the seat busy
+  and manual, with the session's first prompt as its task; a cross-session
+  message, which reaches the same hook, changes nothing. `/clear` frees the
+  seat and pins the new conversation's UUID, so `developer-worker-claude`
+  does not resume the cleared one after a respawn.
+- Managed `autoCompactWindow: 500000`, so seats compact well before their
+  conversations get huge.
+- An empty skills volume is cloned from `crunchtools/josui-skills` at start
+  (#42); an existing checkout is fast-forwarded as before.
+
+### Fixed
+- `org.opencontainers.image.version` is this image's release, not the base
+  image's (it read 5.8.9 on 1.11.0). The boot check fails the build when it
+  and `version` disagree.
 
 ## [1.11.0] - 2026-11-16
 
