@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-17
+
 ### Fixed
 - seat-state treats a background task's result (a prompt opening with
   `<task-notification>`) like a peer's message: the turn is active, and
