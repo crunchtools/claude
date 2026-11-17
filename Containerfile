@@ -59,6 +59,8 @@ FROM quay.io/podman/stable@sha256:bf1f2288540b5cea8f14f232390ba4aedfc64d5e56d6b7
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
 LABEL version="1.11.0"
+# The base sets this to its own release; the image reports ours.
+LABEL org.opencontainers.image.version="1.11.0"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
@@ -119,7 +121,8 @@ RUN mkdir -p /etc/josui /var/lib/josui/josui-skills /var/log/josui && \
 
 COPY rootfs/ /
 
-RUN chmod 0755 /usr/local/bin/developer-entrypoint && \
+RUN chmod 0755 /usr/local/bin/developer-entrypoint /usr/local/bin/developer-worker-claude \
+        /usr/libexec/developer/seat-state && \
     bash -n /usr/local/bin/developer-entrypoint
 
 # HOME is a volume: the Claude login, sessions, git identity and the agent's

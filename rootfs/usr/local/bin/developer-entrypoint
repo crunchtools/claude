@@ -151,7 +151,14 @@ fi
 # start, which never moved, so a seat ran weeks-old skills while every pull
 # reported success. Moving fails safely on local changes it would overwrite,
 # and says so.
-if [ -d "$skills_repo/.git" ]; then
+#
+# An empty volume is cloned (#42: one seat's had never been seeded, so it ran
+# with no skills at all). A directory with files and no .git is left alone.
+skills_url=${JOSUI_SKILLS_URL:-https://github.com/crunchtools/josui-skills}
+if ! [ -e "$skills_repo/.git" ] && [ -z "$(ls -A "$skills_repo" 2>/dev/null)" ]; then
+  git clone --quiet "$skills_url" "$skills_repo" ||
+    log "skills clone failed; starting with no skills"
+elif [ -d "$skills_repo/.git" ]; then
   # origin/HEAD is recorded at clone time; ask the remote what it is now.
   git -C "$skills_repo" remote set-head origin --auto >/dev/null 2>&1 || true
   default=$(git -C "$skills_repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) &&

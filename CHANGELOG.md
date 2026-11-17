@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Seat state for /agents (#44). A managed hook writes
+  `~/.claude/seat-state.json`: a prompt a person types marks the seat busy
+  and manual, with the session's first prompt as its task; a cross-session
+  message, which reaches the same hook, changes nothing. `/clear` frees the
+  seat and pins the new conversation's UUID, so `developer-worker-claude`
+  does not resume the cleared one after a respawn.
+- Managed `autoCompactWindow: 500000`, so seats compact well before their
+  conversations get huge.
+- An empty skills volume is cloned from `crunchtools/josui-skills` at start
+  (#42); an existing checkout is fast-forwarded as before.
+
+### Fixed
+- `org.opencontainers.image.version` is this image's release, not the base
+  image's (it read 5.8.9 on 1.11.0). The boot check fails the build when it
+  and `version` disagree.
+
 ## [1.11.0] - 2026-11-16
 
 ### Changed

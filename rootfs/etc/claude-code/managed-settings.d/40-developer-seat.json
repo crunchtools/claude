@@ -1,0 +1,27 @@
+{
+  "autoCompactWindow": 500000,
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/libexec/developer/seat-state prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/libexec/developer/seat-state start",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
