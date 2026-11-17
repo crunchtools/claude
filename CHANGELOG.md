@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-17
+
 ### Added
 - Seat state for /agents (#44). A managed hook writes
   `~/.claude/seat-state.json`: a prompt a person types marks the seat busy
