@@ -2,8 +2,9 @@
 
 The events are shaped as Claude Code 2.1.304 sends them, captured from the real
 binary: a typed prompt reaches UserPromptSubmit as `prompt`, a cross-session
-message reaches it too (wrapped in <cross-session-message>), and /clear starts
-the new conversation with SessionStart source=clear.
+message reaches it too (wrapped in <cross-session-message>), a turn ends with
+Stop (or StopFailure on an API error), and /clear starts the new conversation
+with SessionStart source=clear.
 """
 
 from __future__ import annotations
@@ -36,7 +37,9 @@ class SeatStateTest(unittest.TestCase):
         self.pin = self.home / ".config/josui/session-id"
 
     def hook(self, event: dict[str, str]) -> subprocess.CompletedProcess[str]:
-        name = "prompt" if event["hook_event_name"] == "UserPromptSubmit" else "start"
+        name = {"UserPromptSubmit": "prompt", "Stop": "stop", "StopFailure": "stop"}.get(
+            event["hook_event_name"], "start"
+        )
         result = subprocess.run(
             [str(SEAT_STATE), name],
             input=json.dumps(event),
@@ -56,6 +59,9 @@ class SeatStateTest(unittest.TestCase):
 
     def start(self, source: str, session: str = CLEARED) -> subprocess.CompletedProcess[str]:
         return self.hook({"hook_event_name": "SessionStart", "session_id": session, "source": source})
+
+    def stop(self, event: str = "Stop", session: str = FIRST) -> subprocess.CompletedProcess[str]:
+        return self.hook({"hook_event_name": event, "session_id": session})
 
     def seat(self) -> dict[str, str]:
         return json.loads(self.state.read_text())
@@ -96,7 +102,10 @@ class SeatStateTest(unittest.TestCase):
 
     def test_a_cross_session_message_is_not_a_person(self) -> None:
         self.prompt(PEER)
-        self.assertFalse(self.state.exists())
+        seat = self.seat()
+        self.assertNotIn("state", seat)
+        self.assertNotIn("owner", seat)
+        self.assertNotIn("task", seat)
 
     def test_a_typed_prompt_quoting_the_marker_is_still_a_person(self) -> None:
         self.prompt("why does the hook skip <cross-session-message from=x>? check it")
@@ -109,9 +118,46 @@ class SeatStateTest(unittest.TestCase):
 
     def test_a_cross_session_message_leaves_a_manual_task_alone(self) -> None:
         self.prompt("first thing")
-        before = self.state.read_text()
+        before = self.seat()
         self.prompt(PEER)
-        self.assertEqual(self.state.read_text(), before)
+        after = self.seat()
+        for key in ("state", "owner", "task", "since", "session_id"):
+            self.assertEqual(after[key], before[key])
+
+    def test_a_typed_prompt_starts_a_turn(self) -> None:
+        self.prompt("first thing")
+        seat = self.seat()
+        self.assertEqual(seat["turn"], "active")
+        self.assertRegex(seat["turn_started"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d")
+
+    # Josui Prime's assignments reach an idle seat as a peer message, not a
+    # typed prompt; the seat is just as mid-turn.
+    def test_a_cross_session_message_starts_a_turn(self) -> None:
+        self.prompt("first thing")
+        self.stop()
+        self.prompt(PEER)
+        seat = self.seat()
+        self.assertEqual(seat["turn"], "active")
+        self.assertNotIn("turn_ended", seat)
+        self.assertEqual(seat["owner"], "manual")
+
+    def test_stop_ends_the_turn(self) -> None:
+        self.prompt("first thing")
+        self.stop()
+        seat = self.seat()
+        self.assertEqual(seat["turn"], "idle")
+        self.assertRegex(seat["turn_ended"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d")
+        self.assertEqual(seat["task"], "first thing")
+        self.assertEqual(seat["state"], "busy")
+
+    def test_a_failed_turn_is_over_too(self) -> None:
+        self.prompt(PEER)
+        self.stop("StopFailure")
+        self.assertEqual(self.seat()["turn"], "idle")
+
+    def test_stop_on_a_seat_with_no_state_records_the_turn(self) -> None:
+        self.stop()
+        self.assertEqual(self.seat()["turn"], "idle")
 
     def test_clear_frees_the_seat(self) -> None:
         self.prompt("first thing")
@@ -120,6 +166,7 @@ class SeatStateTest(unittest.TestCase):
         self.assertEqual(seat["state"], "free")
         self.assertEqual(seat["session_id"], CLEARED)
         self.assertNotIn("task", seat)
+        self.assertEqual(seat["turn"], "idle")
 
     # developer-worker-claude resumes the pinned UUID: re-pinned to the cleared
     # conversation, a respawn does not bring the old one back.
@@ -134,11 +181,23 @@ class SeatStateTest(unittest.TestCase):
         self.start("clear")
         self.assertEqual(self.pin.read_text(), CLEARED + "\n")
 
-    def test_other_session_starts_change_nothing(self) -> None:
+    # A seat that died mid-turn comes back with no turn running.
+    def test_startup_and_resume_end_the_turn_and_keep_the_seat(self) -> None:
+        for source in ("startup", "resume"):
+            self.prompt("first thing")
+            before = self.seat()
+            self.start(source)
+            seat = self.seat()
+            self.assertEqual(seat["turn"], "idle")
+            for key in ("state", "owner", "task", "since", "session_id"):
+                self.assertEqual(seat[key], before[key])
+        self.assertFalse(self.pin.exists())
+
+    # Auto-compaction can fire mid-turn.
+    def test_compact_changes_nothing(self) -> None:
         self.prompt("first thing")
         before = self.state.read_text()
-        for source in ("startup", "resume", "compact"):
-            self.start(source)
+        self.start("compact")
         self.assertEqual(self.state.read_text(), before)
         self.assertFalse(self.pin.exists())
 
@@ -176,8 +235,10 @@ class ManagedSettingsTest(unittest.TestCase):
         hooks = self.settings["hooks"]
         commands = {
             event: [h["command"] for group in hooks[event] for h in group["hooks"]]
-            for event in ("UserPromptSubmit", "SessionStart")
+            for event in ("UserPromptSubmit", "Stop", "StopFailure", "SessionStart")
         }
         self.assertEqual(commands["UserPromptSubmit"], ["/usr/libexec/developer/seat-state prompt"])
+        self.assertEqual(commands["Stop"], ["/usr/libexec/developer/seat-state stop"])
+        self.assertEqual(commands["StopFailure"], ["/usr/libexec/developer/seat-state stop"])
         self.assertEqual(commands["SessionStart"], ["/usr/libexec/developer/seat-state start"])
         self.assertTrue(SEAT_STATE.stat().st_mode & 0o111)
