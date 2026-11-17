@@ -7,7 +7,7 @@ stdin, and writes ~/.claude/seat-state.json:
   seat-state prompt   UserPromptSubmit. A prompt a person typed marks the
                       seat busy and manual, with the session's first prompt
                       as its task. A cross-session message (Josui Prime's
-                      assignments) reaches this hook too, wrapped in
+                      assignments) reaches this hook too, opening with
                       <cross-session-message>, and changes nothing.
   seat-state start    SessionStart. source=clear frees the seat and pins the
                       new conversation's UUID for developer-worker-claude, so
@@ -69,8 +69,9 @@ def now() -> str:
 def on_prompt(event: dict[str, Any], state_path: Path) -> None:
     """UserPromptSubmit: a typed prompt makes the seat busy and manual."""
     prompt = str(event.get("prompt", ""))
-    # The wrapper opens the message, after at most a line of preface.
-    if PEER_MARK in prompt.lstrip()[:200]:
+    # Claude Code hands a peer's message to the hook wrapped and with nothing
+    # before it; a person who quotes the tag later in a prompt is still a person.
+    if prompt.lstrip().startswith(PEER_MARK):
         return
     session = str(event.get("session_id", ""))
     state = read_state(state_path)

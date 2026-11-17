@@ -18,6 +18,11 @@ All notable changes to this project are documented here. The format follows
 - An empty skills volume is cloned from `crunchtools/josui-skills` at start
   (#42); an existing checkout is fast-forwarded as before.
 
+### Fixed
+- `org.opencontainers.image.version` is this image's release, not the base
+  image's (it read 5.8.9 on 1.11.0). The boot check fails the build when it
+  and `version` disagree.
+
 ## [1.11.0] - 2026-11-16
 
 ### Changed

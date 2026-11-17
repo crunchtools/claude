@@ -20,8 +20,8 @@ MANAGED = ROOTFS / "etc/claude-code/managed-settings.d/40-developer-seat.json"
 
 FIRST = "4c3d8432-626e-4ab4-9b5d-6e5e958ce0be"
 CLEARED = "7bbc1c5f-636e-473c-9820-c34794004e1c"
+# As a real SendMessage reaches UserPromptSubmit: the wrapper, nothing before it.
 PEER = (
-    "Another Claude session sent a message:\n"
     '<cross-session-message from="uds:/tmp/cc-socks/121.sock" from-name="Josui Prime" from-mode="bypass">\n'
     "[a99] do the thing\n</cross-session-message>"
 )
@@ -98,9 +98,14 @@ class SeatStateTest(unittest.TestCase):
         self.prompt(PEER)
         self.assertFalse(self.state.exists())
 
-    def test_a_bare_cross_session_message_is_not_a_person_either(self) -> None:
-        self.prompt(PEER.split("\n", 1)[1])
-        self.assertFalse(self.state.exists())
+    def test_a_typed_prompt_quoting_the_marker_is_still_a_person(self) -> None:
+        self.prompt("why does the hook skip <cross-session-message from=x>? check it")
+        self.assertEqual(self.seat()["owner"], "manual")
+        self.assertEqual(self.seat()["state"], "busy")
+
+    def test_a_typed_prompt_quoting_a_whole_peer_message_is_still_a_person(self) -> None:
+        self.prompt("Josui sent this, what does it mean?\n" + PEER)
+        self.assertEqual(self.seat()["owner"], "manual")
 
     def test_a_cross_session_message_leaves_a_manual_task_alone(self) -> None:
         self.prompt("first thing")

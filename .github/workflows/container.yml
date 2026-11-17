@@ -38,6 +38,8 @@ jobs:
       # bypassed (it needs the Josui mounts); the nested engine is not run
       # (a property of the host, settled on gloval, RT#1556).
       boot-command: |
+        labels() { podman image inspect --format "{{index .Config.Labels \"$1\"}}" "$IMAGE"; }
+        test "$(labels org.opencontainers.image.version)" = "$(labels version)"
         podman run --rm --entrypoint /bin/bash \
           --device /dev/fuse --security-opt label=disable \
           "$IMAGE" -c '
