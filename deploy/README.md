@@ -37,6 +37,11 @@ systemctl daemon-reload
 systemctl enable --now skills-sync-push.timer
 ```
 
+The unit runs as root with `RCLONE_CONFIG=/etc/rclone.conf`, where Exedore
+keeps the `pcloud:` remote (root has no rclone config of its own), and is
+sandboxed: `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`,
+`NoNewPrivileges`.
+
 A seat writes its status 0644 from a container subuid, and every directory on
 the way is 0755, so root (or anyone) can read it:
 `head -1 /srv/max1/data/josui-skills/.git/skills-sync.status`.
