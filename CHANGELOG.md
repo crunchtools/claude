@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-11-17
+
 ### Fixed
 - seat-state's handlers take an exclusive flock on
   `~/.claude/.seat-state.lock` around their read-modify-write, so two hooks
