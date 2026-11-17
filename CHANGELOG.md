@@ -9,6 +9,12 @@ All notable changes to this project are documented here. The format follows
 ## [1.14.0] - 2026-11-17
 
 ### Fixed
+- seat-state's handlers take an exclusive flock on
+  `~/.claude/.seat-state.lock` around their read-modify-write, so two hooks
+  running at once cannot interleave. An `idle_prompt` leaves alone a turn
+  that started less than a minute ago: the notice comes at least that long
+  after the turn it reports on, so a younger turn is a prompt that landed
+  meanwhile, and the seat no longer reads idle while busy.
 - seat-state treats a background task's result (a prompt opening with
   `<task-notification>`) like a peer's message: the turn is active, and
   `state`, `owner` and `task` are left alone, instead of the seat turning

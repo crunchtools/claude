@@ -18,7 +18,12 @@ stdin, and writes ~/.claude/seat-state.json:
                       a person interrupts with Esc runs no Stop, but its end
                       arms the idle_prompt timer like any other, which fires
                       a minute later unless someone types meanwhile. An idle
-                      seat keeps its first turn_ended.
+                      seat keeps its first turn_ended, and idle_prompt leaves
+                      alone a turn that started too recently to be the one
+                      it reports on.
+
+Every handler reads, changes and replaces the file under an exclusive flock on
+~/.claude/.seat-state.lock, so two hooks running at once cannot interleave.
   seat-state start    SessionStart. A new process (startup, resume) or a
                       /clear is not mid-turn, so turn is idle. source=clear
                       also frees the seat and pins the new conversation's
@@ -33,16 +38,20 @@ UserPromptSubmit would add to the conversation.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
 import sys
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 TASK_LENGTH = 120
+# Claude Code's messageIdleNotifThresholdMs: idle_prompt comes at least this
+# long after the turn it reports on ended.
+IDLE_NOTICE_AFTER = timedelta(seconds=60)
 # What Claude Code puts first in a prompt it submits on its own.
 HARNESS_MARKS = ("<cross-session-message", "<task-notification")
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -107,11 +116,23 @@ def on_prompt(event: dict[str, Any], state_path: Path) -> None:
     write_atomically(state_path, json.dumps(seat) + "\n")
 
 
-def on_stop(state_path: Path) -> None:
+def started_within(state: dict[str, Any], window: timedelta) -> bool:
+    """Whether the current turn started less than window ago."""
+    try:
+        started = datetime.fromisoformat(str(state["turn_started"]))
+    except (KeyError, ValueError):
+        return False
+    return datetime.now(UTC) - started < window
+
+
+def on_stop(event: dict[str, Any], state_path: Path) -> None:
     """Stop, StopFailure and idle_prompt: the turn is over."""
     state = read_state(state_path)
     # idle_prompt also follows a turn that Stop already ended.
     if state.get("turn") == "idle":
+        return
+    # A late idle_prompt is about the turn before a prompt that just came in.
+    if event.get("hook_event_name") == "Notification" and started_within(state, IDLE_NOTICE_AFTER):
         return
     write_atomically(state_path, json.dumps(idle(state)) + "\n")
 
@@ -140,14 +161,17 @@ def main(argv: list[str]) -> int:
         event = json.load(sys.stdin)
         if not isinstance(event, dict):
             raise ValueError("the event is not a JSON object")
-        if argv[1:] == ["prompt"]:
-            on_prompt(event, state_path)
-        elif argv[1:] == ["stop"]:
-            on_stop(state_path)
-        elif argv[1:] == ["start"]:
-            on_start(event, state_path, pin_path)
-        else:
+        handlers = {
+            "prompt": lambda: on_prompt(event, state_path),
+            "stop": lambda: on_stop(event, state_path),
+            "start": lambda: on_start(event, state_path, pin_path),
+        }
+        if len(argv) != 2 or argv[1] not in handlers:
             raise ValueError(f"usage: seat-state prompt|stop|start, not {argv[1:]}")
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(state_path.parent / ".seat-state.lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            handlers[argv[1]]()
     except (OSError, ValueError) as exc:
         print(f"seat-state: {exc}", file=sys.stderr)
     return 0

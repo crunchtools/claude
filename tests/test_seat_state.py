@@ -9,10 +9,13 @@ with SessionStart source=clear.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import subprocess
 import tempfile
+import time
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOTFS = Path(__file__).resolve().parent.parent / "rootfs"
@@ -176,11 +179,43 @@ class SeatStateTest(unittest.TestCase):
             {"hook_event_name": "Notification", "session_id": FIRST, "notification_type": "idle_prompt"}
         )
 
+    def backdate_turn(self, seconds: int) -> None:
+        seat = self.seat()
+        seat["turn_started"] = (datetime.now(UTC) - timedelta(seconds=seconds)).isoformat(timespec="seconds")
+        self.state.write_text(json.dumps(seat))
+
     # Claude Code runs no Stop after Esc; idle_prompt follows a minute later.
     def test_idle_prompt_ends_an_interrupted_turn(self) -> None:
         self.prompt("first thing")
+        self.backdate_turn(90)
         self.idle_prompt()
         self.assertEqual(self.seat()["turn"], "idle")
+
+    # A prompt that lands while idle_prompt's hook is on its way started a
+    # turn the notice is not about.
+    def test_idle_prompt_leaves_a_turn_that_just_started(self) -> None:
+        self.prompt("first thing")
+        self.backdate_turn(90)
+        self.prompt(PEER)
+        self.idle_prompt()
+        self.assertEqual(self.seat()["turn"], "active")
+
+    def test_a_hook_waits_for_the_lock(self) -> None:
+        self.state.parent.mkdir(parents=True)
+        event = self.home / "event.json"
+        event.write_text(json.dumps({"session_id": FIRST, "prompt": "first thing"}))
+        with open(self.state.parent / ".seat-state.lock", "a") as lock, event.open() as stdin:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            waiting = subprocess.Popen(
+                [str(SEAT_STATE), "prompt"],
+                stdin=stdin,
+                env={"HOME": str(self.home), "PATH": "/usr/bin:/bin"},
+            )
+            time.sleep(0.5)
+            self.assertIsNone(waiting.poll())
+            self.assertFalse(self.state.exists())
+        self.assertEqual(waiting.wait(timeout=10), 0)
+        self.assertEqual(self.seat()["task"], "first thing")
 
     def test_idle_prompt_keeps_the_turn_end_stop_recorded(self) -> None:
         self.prompt("first thing")
