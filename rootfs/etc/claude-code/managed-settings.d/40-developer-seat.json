@@ -44,6 +44,18 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/libexec/developer/seat-state stop",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

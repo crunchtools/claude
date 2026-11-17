@@ -26,6 +26,11 @@ PEER = (
     '<cross-session-message from="uds:/tmp/cc-socks/121.sock" from-name="Josui Prime" from-mode="bypass">\n'
     "[a99] do the thing\n</cross-session-message>"
 )
+# As a background task's result reaches UserPromptSubmit.
+TASK = (
+    "<task-notification>\n<task-id>bq2xk9</task-id>\n<status>completed</status>\n"
+    "<summary>Background command finished</summary>\n</task-notification>"
+)
 
 
 class SeatStateTest(unittest.TestCase):
@@ -37,9 +42,8 @@ class SeatStateTest(unittest.TestCase):
         self.pin = self.home / ".config/josui/session-id"
 
     def hook(self, event: dict[str, str]) -> subprocess.CompletedProcess[str]:
-        name = {"UserPromptSubmit": "prompt", "Stop": "stop", "StopFailure": "stop"}.get(
-            event["hook_event_name"], "start"
-        )
+        # Stop, StopFailure and Notification all run `seat-state stop`.
+        name = {"UserPromptSubmit": "prompt", "SessionStart": "start"}.get(event["hook_event_name"], "stop")
         result = subprocess.run(
             [str(SEAT_STATE), name],
             input=json.dumps(event),
@@ -150,6 +154,41 @@ class SeatStateTest(unittest.TestCase):
         self.assertEqual(seat["task"], "first thing")
         self.assertEqual(seat["state"], "busy")
 
+    def test_a_task_notification_is_not_a_person(self) -> None:
+        self.prompt(TASK)
+        seat = self.seat()
+        self.assertEqual(seat["turn"], "active")
+        self.assertNotIn("owner", seat)
+        self.assertNotIn("task", seat)
+
+    def test_a_task_notification_leaves_a_manual_task_alone(self) -> None:
+        self.prompt("first thing")
+        self.stop()
+        before = self.seat()
+        self.prompt(TASK, session=CLEARED)
+        after = self.seat()
+        self.assertEqual(after["turn"], "active")
+        for key in ("state", "owner", "task", "since", "session_id"):
+            self.assertEqual(after[key], before[key])
+
+    def idle_prompt(self) -> subprocess.CompletedProcess[str]:
+        return self.hook(
+            {"hook_event_name": "Notification", "session_id": FIRST, "notification_type": "idle_prompt"}
+        )
+
+    # Claude Code runs no Stop after Esc; idle_prompt follows a minute later.
+    def test_idle_prompt_ends_an_interrupted_turn(self) -> None:
+        self.prompt("first thing")
+        self.idle_prompt()
+        self.assertEqual(self.seat()["turn"], "idle")
+
+    def test_idle_prompt_keeps_the_turn_end_stop_recorded(self) -> None:
+        self.prompt("first thing")
+        self.stop()
+        before = self.state.read_text()
+        self.idle_prompt()
+        self.assertEqual(self.state.read_text(), before)
+
     def test_a_failed_turn_is_over_too(self) -> None:
         self.prompt(PEER)
         self.stop("StopFailure")
@@ -235,10 +274,12 @@ class ManagedSettingsTest(unittest.TestCase):
         hooks = self.settings["hooks"]
         commands = {
             event: [h["command"] for group in hooks[event] for h in group["hooks"]]
-            for event in ("UserPromptSubmit", "Stop", "StopFailure", "SessionStart")
+            for event in ("UserPromptSubmit", "Stop", "StopFailure", "Notification", "SessionStart")
         }
         self.assertEqual(commands["UserPromptSubmit"], ["/usr/libexec/developer/seat-state prompt"])
         self.assertEqual(commands["Stop"], ["/usr/libexec/developer/seat-state stop"])
         self.assertEqual(commands["StopFailure"], ["/usr/libexec/developer/seat-state stop"])
+        self.assertEqual(commands["Notification"], ["/usr/libexec/developer/seat-state stop"])
+        self.assertEqual([group.get("matcher") for group in hooks["Notification"]], ["idle_prompt"])
         self.assertEqual(commands["SessionStart"], ["/usr/libexec/developer/seat-state start"])
         self.assertTrue(SEAT_STATE.stat().st_mode & 0o111)
