@@ -50,9 +50,13 @@ for attempt in $(seq 100); do
   while read -r pid comm ppid; do
     case $loops in *" $ppid "*)
       [ "$comm" = "(sleep)" ] || continue
-      # kill wants the pid in our namespace: the last NSpid field.
-      while read -r key ids; do [ "$key" = NSpid: ] && pid=${ids##*[[:space:]]}; done < "/proc/$pid/status"
-      kill -KILL "$pid" && killed=1 ;;
+      # kill wants the pid in our namespace: the last NSpid field. Gone
+      # since the scan means no NSpid, and nothing is killed.
+      own=
+      while read -r key ids; do
+        [ "$key" = NSpid: ] && own=${ids##*[[:space:]]}
+      done 2>/dev/null < "/proc/$pid/status"
+      [ -n "$own" ] && kill -KILL "$own" && killed=1 ;;
     esac
   done < "$HOME/ps"
   [ -n "$killed" ] && break
