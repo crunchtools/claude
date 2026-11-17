@@ -32,16 +32,24 @@ pwd > "$HOME/claude-cwd"
 
 # Shell for a stand-in Claude: SIGKILL the sleep of every other child of the
 # entrypoint (the sync loop), as something outside the seat might.
-KILL_LOOP_SLEEP = r"""for f in /proc/[0-9]*/stat; do
-  read -r pid comm _ ppid _ < "$f" 2>/dev/null && echo "$pid $comm $ppid"
-done > "$HOME/ps"
-loops=" "
-while read -r pid comm ppid; do
-  [ "$ppid" = "$PPID" ] && [ "$pid" != "$$" ] && loops+="$pid "
-done < "$HOME/ps"
-while read -r pid comm ppid; do
-  case $loops in *" $ppid "*) [ "$comm" = "(sleep)" ] && kill -KILL "$pid" ;; esac
-done < "$HOME/ps"
+#
+# The loop may not have started its sleep yet (a loaded machine, as under
+# `sdlc pytest`), so look again until a sleep has been killed.
+KILL_LOOP_SLEEP = r"""killed=
+for attempt in $(seq 100); do
+  for f in /proc/[0-9]*/stat; do
+    read -r pid comm _ ppid _ < "$f" 2>/dev/null && echo "$pid $comm $ppid"
+  done > "$HOME/ps"
+  loops=" "
+  while read -r pid comm ppid; do
+    [ "$ppid" = "$PPID" ] && [ "$pid" != "$$" ] && loops+="$pid "
+  done < "$HOME/ps"
+  while read -r pid comm ppid; do
+    case $loops in *" $ppid "*) [ "$comm" = "(sleep)" ] && kill -KILL "$pid" && killed=1 ;; esac
+  done < "$HOME/ps"
+  [ -n "$killed" ] && break
+  sleep 0.1
+done
 """
 
 
