@@ -326,10 +326,12 @@ class ManagedSettingsTest(unittest.TestCase):
             event: [h["command"] for group in hooks[event] for h in group["hooks"]]
             for event in ("UserPromptSubmit", "Stop", "StopFailure", "Notification", "SessionStart")
         }
-        self.assertEqual(commands["UserPromptSubmit"], ["/usr/libexec/developer/seat-state prompt"])
-        self.assertEqual(commands["Stop"], ["/usr/libexec/developer/seat-state stop"])
-        self.assertEqual(commands["StopFailure"], ["/usr/libexec/developer/seat-state stop"])
-        self.assertEqual(commands["Notification"], ["/usr/libexec/developer/seat-state stop"])
+        state, desk = "/usr/libexec/developer/seat-state", "/usr/libexec/developer/ashigaru-hook"
+        # Both until the Desk cutover: seat-state.json and the Desk.
+        self.assertEqual(commands["UserPromptSubmit"], [f"{state} prompt", f"{desk} prompt-submit"])
+        self.assertEqual(commands["Stop"], [f"{state} stop", f"{desk} stop"])
+        self.assertEqual(commands["StopFailure"], [f"{state} stop", f"{desk} stop"])
+        self.assertEqual(commands["Notification"], [f"{state} stop", f"{desk} stop"])
         self.assertEqual([group.get("matcher") for group in hooks["Notification"]], ["idle_prompt"])
-        self.assertEqual(commands["SessionStart"], ["/usr/libexec/developer/seat-state start"])
+        self.assertEqual(commands["SessionStart"], [f"{state} start", f"{desk} session-start"])
         self.assertTrue(SEAT_STATE.stat().st_mode & 0o111)

@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- The `ashigaru` CLI, from the Ashigaru 3.x release RPM (`ASHIGARU_VERSION`,
+  pinned to 3.0.0).
+- Managed hooks run `/usr/libexec/developer/ashigaru-hook` beside seat-state
+  on SessionStart, UserPromptSubmit, Stop, StopFailure and the idle_prompt
+  Notification, reporting the seat's turn and task to the Desk through
+  `ashigaru hook`. It does nothing until the seat has `ASHIGARU_URL` and a key
+  (`ASHIGARU_API_KEY_FILE` or `ASHIGARU_API_KEY`). seat-state stays until the
+  cutover.
+
+### Fixed
+- `sdlc` runs a converted repo's own `.sdlc/bin/sdlc` instead of exiting 2
+  for want of a pinned python-sdlc `rev:`.
+
 ## [1.14.1] - 2026-11-17
 
 ### Fixed

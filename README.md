@@ -71,6 +71,11 @@ task's result starts a turn like a typed prompt does, but leaves `state`,
 for about a minute, until Claude Code's idle notification ends it; if someone
 types in that minute, it stays `active` until the next turn ends.
 
+The same events also go to the Ashigaru Desk through `ashigaru hook`, which
+applies the same rules. That hook does nothing until the seat is given
+`ASHIGARU_URL` and a key (`ASHIGARU_API_KEY_FILE`, or `ASHIGARU_API_KEY`); both
+run until the cutover retires seat-state.json.
+
 A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-agent run`
 instead: one session that the Matrix bridge texts into, Remote Control reaches
 and `claude-agent send` prompts. claude-agent keeps it in tmux on a server of
@@ -109,7 +114,9 @@ The point of this image is that `sdlc push` runs here in minutes instead of a
 CI round trip. Measured on a trentina clone, 2026-11-06: **293s in a seat
 against 416s on the laptop** for the same tier, the same night.
 
-`sdlc` is on `PATH`. It reads the `rev:` the repo pins for python-sdlc in
+`sdlc` is on `PATH`. In a converted repo, one carrying `.sdlc/bin/sdlc`, it
+runs that file, as the repo's hooks and CI do. Otherwise it reads the `rev:`
+the repo pins for python-sdlc in
 `.pre-commit-config.yaml`, clones that exact tag once into
 `~/.cache/crunchtools-sdlc`, and execs its launcher — so a gate run by hand and
 the same gate in CI are the same tool. It never guesses a version: python-sdlc's

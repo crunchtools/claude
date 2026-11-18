@@ -68,6 +68,11 @@ LABEL description="developer - a crunchtools development agent: Claude Code with
 # bump both files together, by hand.
 ARG CLAUDE_CODE_VERSION=2.1.304
 ARG CLAUDE_AGENT_VERSION=1.2.0
+# The Ashigaru CLI, whose `ashigaru hook` reports this seat to the Desk. 3.x
+# is a Python package shipped as an RPM on each GitHub release, built on
+# fedora:43 and centos:stream10; the fc43 build is noarch against Python 3.14,
+# which is this base's too. A bump is this one line.
+ARG ASHIGARU_VERSION=3.0.0
 
 USER 0
 
@@ -113,6 +118,15 @@ RUN dnf -y upgrade && \
     python3 -c 'import sys; assert sys.version_info[:2] >= (3, 14), sys.version' && \
     uv --version && tmux -V && podman --version
 
+# Straight from the release over TLS, not from a dnf repository: the
+# crunchtools repo does not carry ashigaru, and a release that has no RPM
+# attached fails the build here rather than shipping a seat without the CLI.
+RUN dnf -y install --setopt=install_weak_deps=0 \
+        "https://github.com/crunchtools/ashigaru/releases/download/v${ASHIGARU_VERSION}/ashigaru-${ASHIGARU_VERSION}-1.fc43.noarch.rpm" && \
+    dnf -y clean all && \
+    rm -rf /var/cache/dnf && \
+    ashigaru --help > /dev/null
+
 # uid 1000 is the base's own `podman` user, with the subuid ranges that make
 # nesting work. It is NOT renamed to josui: that layout is the reason this
 # base was chosen, and HOME follows it instead.
@@ -123,7 +137,7 @@ COPY rootfs/ /
 
 RUN chmod 0755 /usr/local/bin/developer-entrypoint /usr/local/bin/developer-worker-claude \
         /usr/local/bin/developer-skills-sync \
-        /usr/libexec/developer/seat-state && \
+        /usr/libexec/developer/seat-state /usr/libexec/developer/ashigaru-hook && \
     bash -n /usr/local/bin/developer-entrypoint
 
 # HOME is a volume: the Claude login, sessions, git identity and the agent's
