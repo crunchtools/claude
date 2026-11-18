@@ -6,7 +6,8 @@ import re
 import unittest
 from pathlib import Path
 
-CONTAINERFILE = Path(__file__).resolve().parent.parent / "Containerfile"
+ROOT = Path(__file__).resolve().parent.parent
+CONTAINERFILE = ROOT / "Containerfile"
 
 
 class LabelTest(unittest.TestCase):
@@ -47,3 +48,11 @@ class AshigaruSkillTest(unittest.TestCase):
         text = CONTAINERFILE.read_text()
         self.assertRegex(text, r"(?m)^\s+ASHIGARU_URL=https://ashigaru\.crunchtools\.com \\$")
         self.assertNotIn("ASHIGARU_API_KEY=", text)
+
+
+class ImageCopyTmpDirTest(unittest.TestCase):
+    # The units cap /var/tmp at 1 GB of tmpfs, too small for a large
+    # `podman build`; buildah stages under the storage volume instead.
+    def test_buildah_stages_under_the_storage_volume(self) -> None:
+        conf = ROOT / "rootfs/etc/containers/containers.conf.d/50-image-copy-tmp-dir.conf"
+        self.assertRegex(conf.read_text(), r'(?ms)^\[engine\]$.*^image_copy_tmp_dir = "storage"$')

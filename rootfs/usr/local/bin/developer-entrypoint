@@ -52,6 +52,10 @@ done
 
 mkdir -p "$claude_dir/skills" "$claude_dir/hooks" "$workdir"
 
+# Buildah stages under <graphroot>/tmp (containers.conf.d/50-image-copy-tmp-dir.conf)
+# and fails with "no such file or directory" rather than create it.
+mkdir -p "$HOME/.local/share/containers/storage/tmp"
+
 # Identity is copied in, not linked: the mount is read-only and Claude Code
 # rewrites its own settings file. The mounted copy wins again at next start.
 #

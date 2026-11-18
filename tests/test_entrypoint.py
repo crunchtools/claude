@@ -162,6 +162,11 @@ class EntrypointTest(EntrypointCase):
         self.assertEqual(args[-1], "josui")
         self.assertEqual((self.home / "claude-cwd").read_text().strip(), str(self.home / "work"))
 
+    def test_the_buildah_staging_dir_exists_under_storage(self) -> None:
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.home / ".local/share/containers/storage/tmp").is_dir())
+
     def test_remote_control_status_output_is_dropped_and_errors_are_kept(self) -> None:
         result = self.run_entrypoint()
         self.assertNotIn("status screen", result.stdout)
