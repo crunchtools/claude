@@ -129,7 +129,40 @@ class SkillsSyncTest(SkillsSyncCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("fetch failed", result.stderr)
         self.assertEqual(status_of(self.repo)["fetched"], fetched)
-        self.assertEqual(status_of(self.repo)["state"], "current")
+
+    def test_a_failed_fetch_is_stale_not_current_and_dated(self) -> None:
+        self.sync()
+        good = status_of(self.repo)
+        self.assertEqual(good["state"], "current")
+        self.assertEqual(good["drift_since"], "0")
+        self.git(self.repo, "remote", "set-url", "origin", str(self.root / "gone"))
+
+        # The stale origin/main still equals HEAD; that must not read as current.
+        self.sync()
+        first = status_of(self.repo)
+        self.sync()
+        second = status_of(self.repo)
+
+        self.assertEqual(first["head"], first["origin"])
+        self.assertEqual(first["state"], "stale")
+        self.assertGreater(int(first["drift_since"]), 0)
+        self.assertEqual(second["state"], "stale")
+        self.assertEqual(second["drift_since"], first["drift_since"])
+        self.assertEqual(second["fetched"], good["fetched"])
+
+    def test_a_fetch_that_works_again_is_current_and_clears_the_drift(self) -> None:
+        self.sync()
+        self.git(self.repo, "remote", "set-url", "origin", str(self.root / "gone"))
+        self.sync()
+        self.assertEqual(status_of(self.repo)["state"], "stale")
+        self.git(self.repo, "remote", "set-url", "origin", str(self.upstream))
+
+        self.sync()
+
+        after = status_of(self.repo)
+        self.assertEqual(after["state"], "current")
+        self.assertEqual(after["drift_since"], "0")
+        self.assertGreater(int(after["fetched"]), 0)
 
     def test_an_empty_directory_is_cloned(self) -> None:
         shutil.rmtree(self.repo)
