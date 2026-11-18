@@ -14,6 +14,10 @@ All notable changes to this project are documented here. The format follows
   never the value (#77).
 
 ### Fixed
+- Managed settings deny `EnterPlanMode`. A seat that entered plan mode left it
+  through ExitPlanMode's approval dialog, which only a person at the pane can
+  answer and a cross-session message cannot, so a dispatched seat waited there
+  overnight (a314). The brief a seat is dispatched with is the approved plan.
 - `developer-skills-sync` no longer reports `state=current` when this pass's
   fetch failed. A checkout whose fetches always fail (a 401 from GitHub) kept
   comparing HEAD with a stale `origin/main` and read current with `fetched=0`.

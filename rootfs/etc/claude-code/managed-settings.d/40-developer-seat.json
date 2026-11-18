@@ -1,5 +1,10 @@
 {
   "autoCompactWindow": 500000,
+  "permissions": {
+    "deny": [
+      "EnterPlanMode"
+    ]
+  },
   "hooks": {
     "UserPromptSubmit": [
       {
