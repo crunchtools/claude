@@ -71,8 +71,11 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # The Ashigaru CLI, whose `ashigaru hook` reports this seat to the Desk. 3.x
 # is a Python package shipped as an RPM on each GitHub release, built on
 # fedora:43 and centos:stream10; the fc43 build is noarch against Python 3.14,
-# which is this base's too. A bump is this one line.
+# which is this base's too. A bump is these two lines: the version and the
+# sha256 of that release's fc43 RPM. Only one RPM is installed (noarch, one
+# dist), so one hash covers it.
 ARG ASHIGARU_VERSION=3.0.0
+ARG ASHIGARU_SHA256=6c493397db5867f3de1c9d3156fa438d4196db406cabd51563be127465129758
 
 USER 0
 
@@ -118,11 +121,17 @@ RUN dnf -y upgrade && \
     python3 -c 'import sys; assert sys.version_info[:2] >= (3, 14), sys.version' && \
     uv --version && tmux -V && podman --version
 
-# Straight from the release over TLS, not from a dnf repository: the
-# crunchtools repo does not carry ashigaru, and a release that has no RPM
-# attached fails the build here rather than shipping a seat without the CLI.
-RUN dnf -y install --setopt=install_weak_deps=0 \
-        "https://github.com/crunchtools/ashigaru/releases/download/v${ASHIGARU_VERSION}/ashigaru-${ASHIGARU_VERSION}-1.fc43.noarch.rpm" && \
+# Straight from the release, not from a dnf repository: the crunchtools repo
+# does not carry ashigaru, and a release that has no RPM attached fails the
+# build here rather than shipping a seat without the CLI. The RPM is unsigned
+# and rpm.yml uploads with --clobber, so the asset at that URL can be replaced:
+# the pinned hash, not TLS, is what says this is the file that was reviewed.
+RUN rpm=/tmp/ashigaru-${ASHIGARU_VERSION}-1.fc43.noarch.rpm && \
+    curl -fsSL -o "$rpm" \
+        "https://github.com/crunchtools/ashigaru/releases/download/v${ASHIGARU_VERSION}/${rpm##*/}" && \
+    echo "${ASHIGARU_SHA256}  $rpm" | sha256sum -c --strict - && \
+    dnf -y install --setopt=install_weak_deps=0 "$rpm" && \
+    rm -f "$rpm" && \
     dnf -y clean all && \
     rm -rf /var/cache/dnf && \
     ashigaru --help > /dev/null

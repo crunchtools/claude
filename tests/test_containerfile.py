@@ -16,3 +16,13 @@ class LabelTest(unittest.TestCase):
         labels = dict(re.findall(r'^LABEL ([\w.]+)="([^"]*)"', CONTAINERFILE.read_text(), re.M))
         self.assertRegex(labels["version"], r"^\d+\.\d+\.\d+$")
         self.assertEqual(labels.get("org.opencontainers.image.version"), labels["version"])
+
+
+class AshigaruPinTest(unittest.TestCase):
+    # The release asset can be replaced (rpm.yml uploads with --clobber), so
+    # the build installs only an RPM whose hash is pinned here.
+    def test_the_rpm_is_pinned_by_sha256(self) -> None:
+        args = dict(re.findall(r"^ARG (ASHIGARU_\w+)=(\S*)$", CONTAINERFILE.read_text(), re.M))
+        self.assertRegex(args["ASHIGARU_VERSION"], r"^\d+\.\d+\.\d+$")
+        self.assertRegex(args["ASHIGARU_SHA256"], r"^[0-9a-f]{64}$")
+        self.assertIn("sha256sum -c --strict", CONTAINERFILE.read_text())

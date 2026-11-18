@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 - The `ashigaru` CLI, from the Ashigaru 3.x release RPM (`ASHIGARU_VERSION`,
-  pinned to 3.0.0).
+  pinned to 3.0.0), checked against `ASHIGARU_SHA256` before it is installed.
 - Managed hooks run `/usr/libexec/developer/ashigaru-hook` beside seat-state
   on SessionStart, UserPromptSubmit, Stop, StopFailure and the idle_prompt
   Notification, reporting the seat's turn and task to the Desk through
