@@ -40,8 +40,9 @@ push may move. The nested engine pulls through that same allowlist.
 
 The seat's gateway token is `TRENTINA_MCP_TOKEN`, or the file named by
 `TRENTINA_MCP_TOKEN_FILE` (one line; a trailing newline is stripped), which
-wins. A `TRENTINA_MCP_TOKEN_FILE` that is missing, unreadable, empty or more
-than one line stops the container rather than starting it without a gateway.
+wins. A `TRENTINA_MCP_TOKEN_FILE` that is missing, unreadable, empty, over 4096
+bytes, holds a NUL or is more than one line stops the container rather than
+starting it without a gateway.
 The token is written to Claude Code's state file, git's include file and
 `gatehouse.env`, all 0600, and removed from the environment before Claude Code
 starts. It is the only secret the entrypoint reads; the Matrix token is already

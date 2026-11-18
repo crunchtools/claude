@@ -221,6 +221,22 @@ class EntrypointTest(unittest.TestCase):
     def test_a_token_file_that_is_a_directory_stops_the_start(self) -> None:
         self.assert_refused({**self.env, "TRENTINA_MCP_TOKEN_FILE": str(self.root)})
 
+    @unittest.skipIf(os.geteuid() == 0, "root reads a file whatever its mode")
+    def test_an_unreadable_token_file_stops_the_start(self) -> None:
+        env = self.token_file("file-token\n")
+        Path(env["TRENTINA_MCP_TOKEN_FILE"]).chmod(0)
+        self.assert_refused(env)
+
+    def test_a_token_file_with_a_nul_stops_the_start(self) -> None:
+        self.assert_refused(self.token_file("file-token\0extra\n"))
+
+    def test_an_oversized_token_file_stops_the_start(self) -> None:
+        self.assert_refused(self.token_file("x" * 4097))
+
+    def test_a_token_file_at_the_size_limit_is_accepted(self) -> None:
+        result = self.run_entrypoint(env=self.token_file("x" * 4095 + "\n"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_an_empty_token_file_stops_the_start(self) -> None:
         self.assert_refused(self.token_file(""))
         self.assert_refused(self.token_file("\n"))
