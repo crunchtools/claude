@@ -24,11 +24,12 @@ if [ -n "${TRENTINA_MCP_TOKEN_FILE:-}" ]; then
     exit 1
   fi
   # read is a builtin, so the token is never in a process's arguments. It
-  # stops at a NUL or after 4097 characters and succeeds only then; reaching
-  # the end of the file is the one way through. So a NUL cannot cut the token
-  # short unnoticed, and a huge file is not read into memory.
+  # stops at a NUL or after 4097 bytes and succeeds only then; reaching the end
+  # of the file is the one way through. So a NUL cannot cut the token short
+  # unnoticed, and a huge file is not read into memory. LC_ALL=C because -n
+  # counts characters in the locale, and the limit is in bytes.
   token_from_file=
-  if IFS= read -r -d '' -n 4097 token_from_file < "$TRENTINA_MCP_TOKEN_FILE"; then
+  if LC_ALL=C IFS= read -r -d '' -n 4097 token_from_file < "$TRENTINA_MCP_TOKEN_FILE"; then
     log "TRENTINA_MCP_TOKEN_FILE holds a NUL or is over 4096 bytes; not starting"
     exit 1
   fi

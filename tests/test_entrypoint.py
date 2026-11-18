@@ -233,6 +233,10 @@ class EntrypointTest(unittest.TestCase):
     def test_an_oversized_token_file_stops_the_start(self) -> None:
         self.assert_refused(self.token_file("x" * 4097))
 
+    def test_the_size_limit_is_in_bytes_in_a_multibyte_locale(self) -> None:
+        env = {**self.token_file("\u00e9" * 2049), "LC_ALL": "C.UTF-8"}
+        self.assert_refused(env)
+
     def test_a_token_file_at_the_size_limit_is_accepted(self) -> None:
         result = self.run_entrypoint(env=self.token_file("x" * 4095 + "\n"))
         self.assertEqual(result.returncode, 0, result.stderr)
