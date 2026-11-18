@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-18
+
 ### Added
 - `TRENTINA_MCP_TOKEN_FILE`: the entrypoint reads the gateway token from that
   file, stripping one trailing newline, and it wins over `TRENTINA_MCP_TOKEN`.
