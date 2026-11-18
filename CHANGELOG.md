@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- The `/ashigaru` skill, from the Ashigaru RPM, linked into Claude Code's
+  managed skills folder (`/etc/claude-code/.claude/skills/ashigaru`), so every
+  seat and Josui Prime can run it. josui-skills' `/agents` is unchanged.
+- `ASHIGARU_URL` defaults to `https://ashigaru.crunchtools.com`. The key still
+  comes only from the unit; without it `ashigaru` says "no API key" and
+  ashigaru-hook stays silent.
+
+### Changed
+- Ashigaru 3.0.0 to 3.3.0 (`ASHIGARU_VERSION`, `ASHIGARU_SHA256`).
+
 ## [1.16.0] - 2026-11-18
 
 ### Added

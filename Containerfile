@@ -74,8 +74,8 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # which is this base's too. A bump is these two lines: the version and the
 # sha256 of that release's fc43 RPM. Only one RPM is installed (noarch, one
 # dist), so one hash covers it.
-ARG ASHIGARU_VERSION=3.0.0
-ARG ASHIGARU_SHA256=6c493397db5867f3de1c9d3156fa438d4196db406cabd51563be127465129758
+ARG ASHIGARU_VERSION=3.3.0
+ARG ASHIGARU_SHA256=23840a7d32f50071021fcc187d38997bd1ddcccded0716a34a930113630f3379
 
 USER 0
 
@@ -126,6 +126,12 @@ RUN dnf -y upgrade && \
 # build here rather than shipping a seat without the CLI. The RPM is unsigned
 # and rpm.yml uploads with --clobber, so the asset at that URL can be replaced:
 # the pinned hash, not TLS, is what says this is the file that was reviewed.
+#
+# The RPM ships the /ashigaru skill under /usr/share/ashigaru/skills. HOME is
+# a volume, so ~/.claude/skills cannot carry it: it is linked into Claude
+# Code's managed skills folder, /etc/claude-code/.claude/skills, which every
+# session loads beside the josui-skills links in ~/.claude/skills. A link, not
+# a copy, so a version bump brings its own skill with it.
 RUN rpm=/tmp/ashigaru-${ASHIGARU_VERSION}-1.fc43.noarch.rpm && \
     curl -fsSL -o "$rpm" \
         "https://github.com/crunchtools/ashigaru/releases/download/v${ASHIGARU_VERSION}/${rpm##*/}" && \
@@ -134,6 +140,10 @@ RUN rpm=/tmp/ashigaru-${ASHIGARU_VERSION}-1.fc43.noarch.rpm && \
     rm -f "$rpm" && \
     dnf -y clean all && \
     rm -rf /var/cache/dnf && \
+    mkdir -p /etc/claude-code/.claude/skills && \
+    ln -s /usr/share/ashigaru/skills/ashigaru /etc/claude-code/.claude/skills/ashigaru && \
+    test -f /etc/claude-code/.claude/skills/ashigaru/SKILL.md && \
+    test "$(rpm -q --qf '%{VERSION}' ashigaru)" = "$ASHIGARU_VERSION" && \
     ashigaru --help > /dev/null
 
 # uid 1000 is the base's own `podman` user, with the subuid ranges that make
@@ -158,7 +168,12 @@ RUN chmod 0755 /usr/local/bin/developer-entrypoint /usr/local/bin/developer-work
 # PYTEST_XDIST_AUTO_NUM_WORKERS: `-n auto` (trentina's addopts) otherwise
 # starts one ~280 MB worker per host core -- 24 here -- which is past the
 # seat's memcg, and the OOM killer takes the Claude session with the tests.
+# ASHIGARU_URL is where the Desk is, which is config: the image says it once
+# rather than every unit. The key is not, and comes only from the unit
+# (ASHIGARU_API_KEY_FILE); without one `ashigaru` stops with "no API key" and
+# ashigaru-hook stays silent, as before.
 ENV HOME=/home/podman \
+    ASHIGARU_URL=https://ashigaru.crunchtools.com \
     LANG=C.UTF-8 \
     PYTEST_XDIST_AUTO_NUM_WORKERS=4 \
     JOSUI_CONFIG_DIR=/etc/josui \

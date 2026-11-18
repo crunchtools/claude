@@ -82,9 +82,12 @@ for about a minute, until Claude Code's idle notification ends it; if someone
 types in that minute, it stays `active` until the next turn ends.
 
 The same events also go to the Ashigaru Desk through `ashigaru hook`, which
-applies the same rules. That hook does nothing until the seat is given
-`ASHIGARU_URL` and a key (`ASHIGARU_API_KEY_FILE`, or `ASHIGARU_API_KEY`); both
-run until the cutover retires seat-state.json.
+applies the same rules. The image sets `ASHIGARU_URL` to
+`https://ashigaru.crunchtools.com`; the hook does nothing until the seat is
+also given a key (`ASHIGARU_API_KEY_FILE`, or `ASHIGARU_API_KEY`). Both run
+until the cutover retires seat-state.json. The Ashigaru RPM's `/ashigaru`
+skill is linked into Claude Code's managed skills folder,
+`/etc/claude-code/.claude/skills`, so every seat has it beside josui-skills.
 
 A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-agent run`
 instead: one session that the Matrix bridge texts into, Remote Control reaches
