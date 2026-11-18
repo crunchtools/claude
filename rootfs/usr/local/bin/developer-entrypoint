@@ -11,6 +11,30 @@ workdir=${JOSUI_WORKDIR:-$HOME/work}
 
 log() { echo "josui: $*" >&2; }
 
+# The gateway token may come as a file instead (#77): Exedore delivers a seat's
+# secrets as files under /run/srv-secrets. The file wins over the variable. It
+# is read into TRENTINA_MCP_TOKEN, so it reaches exactly what the variable
+# always reached and is unset with it below. One trailing newline is stripped.
+# A file that is missing, unreadable, empty or more than one line stops the
+# start, naming the variable and never the value: a seat that came up without
+# its gateway would look healthy and do nothing.
+if [ -n "${TRENTINA_MCP_TOKEN_FILE:-}" ]; then
+  if ! [ -f "$TRENTINA_MCP_TOKEN_FILE" ] || ! [ -r "$TRENTINA_MCP_TOKEN_FILE" ]; then
+    log "TRENTINA_MCP_TOKEN_FILE is set but is not a readable file; not starting"
+    exit 1
+  fi
+  # read is a builtin, so the token is never in a process's arguments.
+  token_from_file=
+  IFS= read -r -d '' token_from_file < "$TRENTINA_MCP_TOKEN_FILE" || true
+  token_from_file=${token_from_file%$'\n'}
+  if [ -z "$token_from_file" ] || [[ "$token_from_file" == *[$'\n\r']* ]]; then
+    log "TRENTINA_MCP_TOKEN_FILE is empty or not a single line; not starting"
+    exit 1
+  fi
+  export TRENTINA_MCP_TOKEN=$token_from_file
+  unset token_from_file TRENTINA_MCP_TOKEN_FILE
+fi
+
 # josui.env keeps the names it has always had; claude-agent reads its own.
 for name in ANSWER_PERMISSIONS MAX_TOOL_CALLS MAX_REPEAT; do
   value="JOSUI_$name"

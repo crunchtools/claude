@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `TRENTINA_MCP_TOKEN_FILE`: the entrypoint reads the gateway token from that
+  file, stripping one trailing newline, and it wins over `TRENTINA_MCP_TOKEN`.
+  A file that is missing, unreadable, empty or more than one line stops the
+  start with a message naming the variable, never the value (#77).
+
 ## [1.15.0] - 2026-11-18
 
 ### Added
