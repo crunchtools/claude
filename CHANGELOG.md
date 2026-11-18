@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-18
+
 ### Added
 - The `ashigaru` CLI, from the Ashigaru 3.x release RPM (`ASHIGARU_VERSION`,
   pinned to 3.0.0), checked against `ASHIGARU_SHA256` before it is installed.
