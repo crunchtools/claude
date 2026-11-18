@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `podman build` in a seat no longer runs out of space on the 1 GB `/var/tmp`
+  tmpfs: `/etc/containers/containers.conf.d/50-image-copy-tmp-dir.conf` sets
+  `image_copy_tmp_dir = "storage"`, so podman and buildah stage under the
+  nested engine's storage volume. The entrypoint creates that directory
+  (`~/.local/share/containers/storage/tmp`), which buildah will not. The
+  units' `/var/tmp` cap stays as it is.
+
 ## [1.17.0] - 2026-11-18
 
 ### Added
