@@ -1,0 +1,36 @@
+#!/bin/sh
+# Report this seat's turn and task to the Ashigaru Desk, or do nothing.
+#
+# Run by Claude Code's managed hooks (40-developer-seat.json) beside
+# seat-state, which keeps ~/.claude/seat-state.json until the Desk cutover:
+#
+#   ashigaru-hook session-start | prompt-submit | stop
+#
+# A seat learns where its Desk is from ASHIGARU_URL, and its key from
+# ASHIGARU_API_KEY_FILE (a mounted file) or ASHIGARU_API_KEY. Until both are
+# staged for a seat, this exits 0 having read the event and said nothing: the
+# image ships ahead of the keys, and a seat without them is not misconfigured,
+# only not yet cut over. With both, `ashigaru hook` does the work and owns the
+# rules, including its own time bound and an exit that is always 0.
+#
+# Nothing goes to stdout here, which UserPromptSubmit would add to the
+# conversation.
+
+skip() {
+  # Read the event anyway, so Claude Code never writes into a closed pipe.
+  cat > /dev/null
+  exit 0
+}
+
+[ -n "${ASHIGARU_URL:-}" ] || skip
+if [ -n "${ASHIGARU_API_KEY_FILE:-}" ]; then
+  [ -r "$ASHIGARU_API_KEY_FILE" ] || skip
+elif [ -z "${ASHIGARU_API_KEY:-}" ]; then
+  skip
+fi
+
+if ! command -v ashigaru > /dev/null 2>&1; then
+  echo "ashigaru-hook: the Desk is configured but ashigaru is not installed" >&2
+  skip
+fi
+exec ashigaru hook "$@"

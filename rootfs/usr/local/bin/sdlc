@@ -1,5 +1,9 @@
 #!/bin/bash
-# Run the python-sdlc this repository pins, from an interactive shell.
+# Run the python-sdlc this repository uses, from an interactive shell.
+#
+# A converted repo (.sdlc/bin/sdlc) is run through that file, exactly as its
+# hooks and CI run it. The rest of this script is for a repo that still pins
+# python-sdlc with a `rev:` in .pre-commit-config.yaml.
 #
 # The pre-push hook finds `sdlc` because pre-commit manages its own cache; a
 # person typing in a seat's terminal does not, and `sdlc push` is the whole
@@ -23,6 +27,13 @@ die() {
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) ||
   die "not inside a git repository, so there is no pinned python-sdlc to run"
+
+# A converted repo carries python-sdlc's bootstrap as .sdlc/bin/sdlc and pins
+# no rev: its hooks and its CI job run that file, which takes the launcher
+# from the image. Run it too, or this gate and theirs are different tools.
+if [ -x "$root/.sdlc/bin/sdlc" ]; then
+  exec "$root/.sdlc/bin/sdlc" "$@"
+fi
 
 config="$root/.pre-commit-config.yaml"
 [ -f "$config" ] || die "$config does not exist, so this repo pins no python-sdlc"

@@ -57,6 +57,9 @@ jobs:
           bash -n /usr/local/bin/developer-worker-claude
           test -x /usr/local/bin/developer-worker-claude
           test -x /usr/libexec/developer/seat-state
+          test -x /usr/libexec/developer/ashigaru-hook
+          ashigaru --help > /dev/null
+          echo "{}" | /usr/libexec/developer/ashigaru-hook stop
           python3 -m json.tool /etc/claude-code/managed-settings.d/40-developer-seat.json > /dev/null
         '
     secrets:

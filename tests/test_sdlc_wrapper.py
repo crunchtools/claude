@@ -122,6 +122,19 @@ class WrapperTest(unittest.TestCase):
                 self.assertIn("not a plain tag", result.stderr)
         self.assertFalse((self.root / "escaped").exists())
 
+    def test_a_converted_repo_runs_its_own_launcher(self) -> None:
+        # No `rev:` at all: the repo's hooks and CI run .sdlc/bin/sdlc.
+        (self.repo / ".pre-commit-config.yaml").write_text("repos:\n  - repo: local\n")
+        launcher = self.repo / ".sdlc/bin/sdlc"
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text('#!/bin/sh\necho "repo launcher got: $*"\n')
+        launcher.chmod(0o755)
+        (self.repo / "sub").mkdir()
+        result = self.run_wrapper("push", "--flag", cwd=self.repo / "sub")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("repo launcher got: push --flag", result.stdout)
+        self.assertFalse((self.root / "cache").exists())
+
     def test_an_unreachable_rev_is_a_could_not_run(self) -> None:
         self.write_config(rev="v0.0.0-nope")
         result = self.run_wrapper("push")
