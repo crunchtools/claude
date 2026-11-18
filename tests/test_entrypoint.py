@@ -73,7 +73,9 @@ done
 """
 
 
-class EntrypointTest(unittest.TestCase):
+class EntrypointCase(unittest.TestCase):
+    """A temporary home, a stand-in claude, and the helpers every test here uses."""
+
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -121,6 +123,28 @@ class EntrypointTest(unittest.TestCase):
             timeout=60,
         )
 
+    def git(self, *args: str) -> str:
+        env = {"HOME": str(self.home), "PATH": os.environ["PATH"]}
+        return subprocess.run(
+            ["git", "config", *args], env=env, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    def token_file(self, body: str) -> dict[str, str]:
+        path = self.root / "trentina-token"
+        path.write_text(body)
+        return {**self.env, "TRENTINA_MCP_TOKEN_FILE": str(path)}
+
+    def assert_refused(self, env: dict[str, str]) -> None:
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("TRENTINA_MCP_TOKEN_FILE", result.stderr)
+        self.assertNotIn("s3cret-token", result.stderr)
+        self.assertNotIn("file-token", result.stderr)
+        self.assertFalse((self.home / "claude-args").exists())
+        self.assertFalse((self.home / ".claude.json").exists())
+
+
+class EntrypointTest(EntrypointCase):
     def test_assembles_the_home_and_serves_remote_control(self) -> None:
         result = self.run_entrypoint()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -158,12 +182,6 @@ class EntrypointTest(unittest.TestCase):
         self.run_entrypoint()
         self.assertNotIn("s3cret-token", (self.home / "claude-env").read_text())
 
-    def git(self, *args: str) -> str:
-        env = {"HOME": str(self.home), "PATH": os.environ["PATH"]}
-        return subprocess.run(
-            ["git", "config", *args], env=env, capture_output=True, text=True, check=True
-        ).stdout.strip()
-
     def test_git_goes_to_the_gateway_route_with_the_gateway_token(self) -> None:
         self.run_entrypoint()
         self.run_entrypoint()  # a restart does not add a second include
@@ -177,11 +195,6 @@ class EntrypointTest(unittest.TestCase):
             self.git("--get", "http.http://192.0.2.2:8019/git/.extraHeader"),
             "Authorization: Bearer s3cret-token",
         )
-
-    def token_file(self, body: str) -> dict[str, str]:
-        path = self.root / "trentina-token"
-        path.write_text(body)
-        return {**self.env, "TRENTINA_MCP_TOKEN_FILE": str(path)}
 
     def test_a_token_file_wins_over_the_variable(self) -> None:
         result = self.run_entrypoint(env=self.token_file("file-token\n"))
@@ -206,26 +219,11 @@ class EntrypointTest(unittest.TestCase):
         state = json.loads((self.home / ".claude.json").read_text())
         self.assertEqual(state["mcpServers"]["trentina"]["headers"]["Authorization"], "Bearer file-token")
 
-    def assert_refused(self, env: dict[str, str]) -> None:
-        result = self.run_entrypoint(env=env)
-        self.assertEqual(result.returncode, 1, result.stderr)
-        self.assertIn("TRENTINA_MCP_TOKEN_FILE", result.stderr)
-        self.assertNotIn("s3cret-token", result.stderr)
-        self.assertNotIn("file-token", result.stderr)
-        self.assertFalse((self.home / "claude-args").exists())
-        self.assertFalse((self.home / ".claude.json").exists())
-
     def test_a_missing_token_file_stops_the_start(self) -> None:
         self.assert_refused({**self.env, "TRENTINA_MCP_TOKEN_FILE": str(self.root / "nope")})
 
     def test_a_token_file_that_is_a_directory_stops_the_start(self) -> None:
         self.assert_refused({**self.env, "TRENTINA_MCP_TOKEN_FILE": str(self.root)})
-
-    @unittest.skipIf(os.geteuid() == 0, "root reads a file whatever its mode")
-    def test_an_unreadable_token_file_stops_the_start(self) -> None:
-        env = self.token_file("file-token\n")
-        Path(env["TRENTINA_MCP_TOKEN_FILE"]).chmod(0)
-        self.assert_refused(env)
 
     def test_a_token_file_with_a_nul_stops_the_start(self) -> None:
         self.assert_refused(self.token_file("file-token\0extra\n"))

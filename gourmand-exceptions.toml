@@ -21,21 +21,19 @@ classification = "by_design"
 # The one test of a read-only checkout (Dolza's shared one, mounted read-only
 # into every seat but Josui Prime) makes .git mode 0555. Root writes through
 # mode bits, so as root the condition cannot be built without a privileged
-# read-only mount, which a unit test cannot make.
+# read-only mount, which a unit test cannot make. Gourmand matches exceptions
+# by path alone and ignores `pattern`, so the test has a file to itself.
 [[exceptions]]
 check = "EV003-test_skip_evasion"
-path = "tests/test_skills_sync.py"
-pattern = "skipIf"
+path = "tests/test_skills_sync_readonly.py"
 justification = "Root ignores the 0555 mode the test uses to make a checkout unwritable, and a real read-only mount needs privileges a unit test does not have; the test runs for every non-root user."
 classification = "by_design"
 
-
 # Same reason, for the gateway token file (#77): a 0000 file is unreadable to
 # everyone but root, and nothing short of a privileged mount makes a regular
-# file unreadable to root.
+# file unreadable to root. Its own file, for the same reason.
 [[exceptions]]
 check = "EV003-test_skip_evasion"
-path = "tests/test_entrypoint.py"
-pattern = "test_an_unreadable_token_file_stops_the_start"
+path = "tests/test_entrypoint_unreadable.py"
 justification = "Root reads through the 0000 mode the test uses to make the token file unreadable, and nothing short of a privileged mount changes that; the test runs for every non-root user."
 classification = "by_design"

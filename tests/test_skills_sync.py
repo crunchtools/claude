@@ -19,7 +19,7 @@ def status_of(repo: Path) -> dict[str, str]:
     return dict(field.split("=", 1) for field in line.split()[1:])
 
 
-class SkillsSyncTest(unittest.TestCase):
+class SkillsSyncCase(unittest.TestCase):
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -61,6 +61,8 @@ class SkillsSyncTest(unittest.TestCase):
     def linked(self) -> list[str]:
         return sorted(p.name for p in (self.claude / "skills").iterdir())
 
+
+class SkillsSyncTest(SkillsSyncCase):
     def test_a_merge_upstream_is_fast_forwarded_and_linked(self) -> None:
         self.assertEqual(self.sync().returncode, 0)
         self.assertEqual(self.linked(), ["alpha"])
@@ -128,23 +130,6 @@ class SkillsSyncTest(unittest.TestCase):
         self.assertIn("fetch failed", result.stderr)
         self.assertEqual(status_of(self.repo)["fetched"], fetched)
         self.assertEqual(status_of(self.repo)["state"], "current")
-
-    @unittest.skipIf(os.geteuid() == 0, "root writes through a read-only mode")
-    def test_a_checkout_it_cannot_write_is_only_read_and_relinked(self) -> None:
-        self.add_skill(self.upstream, "beta")
-        before = self.git(self.repo, "rev-parse", "HEAD")
-        self.add_skill(self.repo, "gamma")  # as if the owner had already pulled it
-        gamma = self.git(self.repo, "rev-parse", "HEAD")
-        self.assertNotEqual(before, gamma)
-        (self.repo / ".git").chmod(0o555)
-        self.addCleanup((self.repo / ".git").chmod, 0o755)
-
-        result = self.sync()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.git(self.repo, "rev-parse", "HEAD"), gamma)
-        self.assertEqual(self.linked(), ["alpha", "gamma"])
-        self.assertFalse((self.repo / ".git/skills-sync.status").exists())
 
     def test_an_empty_directory_is_cloned(self) -> None:
         shutil.rmtree(self.repo)
