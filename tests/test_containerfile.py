@@ -26,3 +26,24 @@ class AshigaruPinTest(unittest.TestCase):
         self.assertRegex(args["ASHIGARU_VERSION"], r"^\d+\.\d+\.\d+$")
         self.assertRegex(args["ASHIGARU_SHA256"], r"^[0-9a-f]{64}$")
         self.assertIn("sha256sum -c --strict", CONTAINERFILE.read_text())
+
+
+class AshigaruSkillTest(unittest.TestCase):
+    # HOME is a volume, so the skill reaches Claude Code only through the
+    # managed skills folder; the image build and container.yml check the link
+    # resolves to the RPM's SKILL.md.
+    def test_the_rpm_skill_is_linked_into_managed_skills(self) -> None:
+        self.assertIn(
+            "ln -s /usr/share/ashigaru/skills/ashigaru /etc/claude-code/.claude/skills/ashigaru",
+            CONTAINERFILE.read_text(),
+        )
+
+    def test_the_build_checks_the_installed_version(self) -> None:
+        self.assertIn(
+            'rpm -q --qf \'%{VERSION}\' ashigaru)" = "$ASHIGARU_VERSION"', CONTAINERFILE.read_text()
+        )
+
+    def test_the_image_points_at_the_desk_but_carries_no_key(self) -> None:
+        text = CONTAINERFILE.read_text()
+        self.assertRegex(text, r"(?m)^\s+ASHIGARU_URL=https://ashigaru\.crunchtools\.com \\$")
+        self.assertNotIn("ASHIGARU_API_KEY=", text)
