@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-18
+
 ### Added
 - The `/ashigaru` skill, from the Ashigaru RPM, linked into Claude Code's
   managed skills folder (`/etc/claude-code/.claude/skills/ashigaru`), so every
