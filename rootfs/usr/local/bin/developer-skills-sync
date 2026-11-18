@@ -25,10 +25,11 @@
 #
 #        SKILLSSYNC written=<epoch> state=<state> head=<sha> origin=<sha> drift_since=<epoch> fetched=<epoch>
 #
-#      state is current, behind, diverged or off-branch. drift_since is when
-#      HEAD was first seen differing from origin/<default>, 0 while it does
-#      not. fetched is the last fetch that worked: a checkout that can no
-#      longer reach GitHub reads as a stale fetched, never as "current".
+#      state is current, stale, behind, diverged or off-branch. stale is HEAD
+#      equal to an origin/<default> that this pass could not refresh: the fetch
+#      failed, so "equal" proves nothing. drift_since is when HEAD was first
+#      seen differing from, or unverifiable against, origin/<default>, 0 while
+#      it is not. fetched is the last fetch that worked.
 #
 # A failed step is reported on stderr and the pass goes on; the exit status
 # is 0 unless the arguments are wrong. The next pass tries again.
@@ -52,12 +53,14 @@ repo=$1
 url=${JOSUI_SKILLS_URL:-https://github.com/crunchtools/josui-skills}
 now=$(date +%s)
 fetched=
+fetch_failed=
 
 if ! [ -e "$repo/.git" ] && [ -z "$(ls -A "$repo" 2>/dev/null)" ]; then
   if git clone --quiet "$url" "$repo"; then
     fetched=$now
   else
     log "skills clone of $url into $repo failed; no skills until a pass succeeds"
+    fetch_failed=1
   fi
 elif [ -d "$repo/.git" ] && [ -w "$repo/.git" ]; then
   # origin/HEAD is recorded at clone time; ask the remote what it is now.
@@ -66,6 +69,7 @@ elif [ -d "$repo/.git" ] && [ -w "$repo/.git" ]; then
     fetched=$now
   else
     log "fetch failed in $repo, using the checkout as it is"
+    fetch_failed=1
   fi
 fi
 
@@ -128,7 +132,8 @@ origin=$(git -C "$repo" rev-parse --verify --quiet "origin/$default" 2>/dev/null
 if [ "$(git -C "$repo" branch --show-current)" != "$default" ]; then
   state=off-branch
 elif [ "$head" = "$origin" ]; then
-  state=current
+  # The local origin ref is only as fresh as the last fetch that worked.
+  if [ -n "$fetch_failed" ]; then state=stale; else state=current; fi
 elif [ "$origin" != none ] && git -C "$repo" merge-base --is-ancestor "$head" "$origin" 2>/dev/null; then
   state=behind
 else

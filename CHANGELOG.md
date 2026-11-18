@@ -13,6 +13,13 @@ All notable changes to this project are documented here. The format follows
   is more than one line stops the start with a message naming the variable,
   never the value (#77).
 
+### Fixed
+- `developer-skills-sync` no longer reports `state=current` when this pass's
+  fetch failed. A checkout whose fetches always fail (a 401 from GitHub) kept
+  comparing HEAD with a stale `origin/main` and read current with `fetched=0`.
+  It now writes `state=stale`, aged from `drift_since`, so `check_skills_sync.sh`
+  warns after an hour and goes critical after six.
+
 ## [1.15.0] - 2026-11-18
 
 ### Added
