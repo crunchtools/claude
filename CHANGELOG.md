@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.17.1] - 2026-11-18
+
 ### Fixed
 - `podman build` in a seat no longer runs out of space on the 1 GB `/var/tmp`
   tmpfs: `/etc/containers/containers.conf.d/50-image-copy-tmp-dir.conf` sets
