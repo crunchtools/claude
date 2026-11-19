@@ -333,5 +333,17 @@ class ManagedSettingsTest(unittest.TestCase):
         self.assertEqual(commands["StopFailure"], [f"{state} stop", f"{desk} stop"])
         self.assertEqual(commands["Notification"], [f"{state} stop", f"{desk} stop"])
         self.assertEqual([group.get("matcher") for group in hooks["Notification"]], ["idle_prompt"])
-        self.assertEqual(commands["SessionStart"], [f"{state} start", f"{desk} session-start"])
+        self.assertEqual(
+            commands["SessionStart"], [f"{state} start", f"{desk} session-start", f"{desk} next"]
+        )
         self.assertTrue(SEAT_STATE.stat().st_mode & 0o111)
+
+    def test_next_wakes_a_clean_session_without_holding_it(self) -> None:
+        # The Desk's next item: only where the context is clean, never blocking the prompt.
+        (group,) = [g for g in self.settings["hooks"]["SessionStart"] if g.get("matcher")]
+        self.assertEqual(group["matcher"], "startup|clear")
+        (hook,) = group["hooks"]
+        self.assertEqual(hook["command"], "/usr/libexec/developer/ashigaru-hook next")
+        self.assertIs(hook["async"], True)
+        self.assertIs(hook["asyncRewake"], True)
+        self.assertEqual(hook["timeout"], 86400)

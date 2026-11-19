@@ -36,6 +36,18 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/libexec/developer/ashigaru-hook next",
+            "async": true,
+            "asyncRewake": true,
+            "timeout": 86400
+          }
+        ]
       }
     ],
     "Stop": [
