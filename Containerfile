@@ -58,9 +58,9 @@
 FROM quay.io/podman/stable@sha256:0ccbc4e7f79f9c33e7fc959be59f714abbc0f4c9cffbe14f5bceff537a014738
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.18.1"
+LABEL version="1.18.2"
 # The base sets this to its own release; the image reports ours.
-LABEL org.opencontainers.image.version="1.18.1"
+LABEL org.opencontainers.image.version="1.18.2"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
