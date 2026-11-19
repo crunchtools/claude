@@ -58,9 +58,9 @@
 FROM quay.io/podman/stable@sha256:0ccbc4e7f79f9c33e7fc959be59f714abbc0f4c9cffbe14f5bceff537a014738
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.17.1"
+LABEL version="1.17.2"
 # The base sets this to its own release; the image reports ours.
-LABEL org.opencontainers.image.version="1.17.1"
+LABEL org.opencontainers.image.version="1.17.2"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
@@ -71,11 +71,12 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # The Ashigaru CLI, whose `ashigaru hook` reports this seat to the Desk. 3.x
 # is a Python package shipped as an RPM on each GitHub release, built on
 # fedora:43 and centos:stream10; the fc43 build is noarch against Python 3.14,
-# which is this base's too. A bump is these two lines: the version and the
-# sha256 of that release's fc43 RPM. Only one RPM is installed (noarch, one
-# dist), so one hash covers it.
-ARG ASHIGARU_VERSION=3.3.0
-ARG ASHIGARU_SHA256=23840a7d32f50071021fcc187d38997bd1ddcccded0716a34a930113630f3379
+# which is this base's too. A bump is these two lines -- the version and the
+# sha256 of that release's fc43 RPM -- plus the two version pins in the boot
+# gate (.github/workflows/container.yml), which check the image independently.
+# Only one RPM is installed (noarch, one dist), so one hash covers it.
+ARG ASHIGARU_VERSION=4.0.2
+ARG ASHIGARU_SHA256=5a701f901a118bdbd4adbb8921706910267a13d75d1224058d74fbcf784eeb45
 
 USER 0
 
