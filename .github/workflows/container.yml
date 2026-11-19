@@ -68,6 +68,13 @@ jobs:
           echo "{}" | /usr/libexec/developer/ashigaru-hook stop
           python3 -m json.tool /etc/claude-code/managed-settings.d/40-developer-seat.json > /dev/null
         '
+      # Hosts refuse an unsigned quay.io/crunchtools image
+      # (crunchtools/rhel10-bootc-server#47). Promote signs the gated digest
+      # before any tag moves, with the key from this repo's cosign-signing
+      # environment (main and v* only); without it promote refuses.
+      sign: true
     secrets:
       QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
       QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
