@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.17.2] - 2026-11-19
+
 ### Fixed
 - Gatehouse gates no longer "COULD NOT RUN" on seats whose gateway URL names
   the gateway over plain http (`http://trentina:8019`, the Vertex seats)
