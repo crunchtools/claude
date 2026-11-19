@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 3.0.0
+> **Version:** 3.1.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.46.0
@@ -66,7 +66,11 @@ Identical workers behind one gateway profile per host (dolza's `developer`, glov
 deterministic enforcer and holds the quarantined reader; the agent never
 fetches from the web itself (`WebFetch` and `WebSearch` are denied in its
 settings). Attended mode: each acts only when the operator opens a conversation
-over Remote Control, or types into its tmux session. A worker has **no Matrix
+over Remote Control, types into its tmux session, or Josui Prime's brief
+arrives through the Ashigaru Desk. The Desk hands a brief only while its
+`autodispatch` mark is `on`, and only to an idle, free seat (the SessionStart
+`ashigaru hook next`); a brief is the operator's work routed through Prime, not
+a new input channel, and carries no text path. A worker has **no Matrix
 channel and no text path** — texts reach Josui Prime, which is the right front
 door for an agent that can act on production. Prime's text path is the one
 session it already has: with a homeserver set, `claude-agent run` holds it and
@@ -276,4 +280,5 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 | 1.2.0 | 2026-11-06 | `sdlc` on PATH, resolving the rev the repo pins rather than any default, so a gate run by hand is the same tool CI runs. RT#1556 |
 | 1.1.0 | 2026-11-06 | A seat's `sdlc push` prerequisites move into the image: a git identity from the environment, and tool API keys from a read-only mcp-env mount. Layer 5 now names two credentials rather than one. Measured: 293s for trentina's push tier in a seat against 416s on the laptop. RT#1556 |
 | 1.0.0 | 2026-11-06 | Extracted from josui 0.8.0, where this image was `Containerfile.dev`. Carries the measurements that justify its deviations: the five-capability set, `label=disable` with no AVC to replace it, `unmask=/proc/*`, the unprivileged UID map, and the fact that liveness is not monitorable from inside. RT#1556 |
+| 3.1.0 | 2026-11-19 | Attended mode names Josui Prime's brief through the Ashigaru Desk as a sanctioned input, gated by the Desk's `autodispatch` mark and an idle, free seat. MINOR: a new sanctioned input, no boundary removed. developer#101 |
 | 3.0.0 | 2026-11-14 | A third role, Dolza admin seats (Dolza (Vertex) 1-4, Dolza (Max) 1-4): own ssh key each to Breetai, Gloval, Dolza and Exedore, on tmpfs, `from=` dolza, revocable per seat. The Dolza pod is one trust domain. Workers are now the Exedore seats only. MAJOR because "a worker never gets production reach or Prime's token" stops being true on Dolza |
