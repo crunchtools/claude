@@ -1,6 +1,7 @@
-# developer — a crunchtools development agent: Claude Code that can build
+# claude — the crunchtools build of Claude Code in a container, for agents
+# that build the fleet and the one that dispatches them
 #
-# Published as `developer`. The image is tooling; who runs in it is decided by
+# Published as `claude` (crunchtools/claude#41; it was `developer`). The image is tooling; who runs in it is decided by
 # the unit's mounts. Josui Prime runs it with Prime's identity and state, as
 # the dispatcher on dolza. The workers (Vertex 1-4 on dolza, Max 1-4 on
 # exedore) run it with the developer identity, their own Trentina profile and
@@ -63,8 +64,8 @@ FROM quay.io/crunchtools/podman-stable:v6.2.0-immutable@sha256:39a21e7832dbf0188
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
 LABEL version="1.23.0"
 # The base sets this to its own release; the image reports ours.
-LABEL org.opencontainers.image.version="1.23.0"
-LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
+LABEL org.opencontainers.image.version="1.24.0"
+LABEL description="claude - the crunchtools build of Claude Code: a toolchain and nested podman for development agents"
 
 # The same versions the production image runs. A new Claude Code or
 # claude-agent is tested on Josui Prime before it reaches a dev container:
@@ -158,10 +159,21 @@ RUN mkdir -p /etc/josui /var/lib/josui/josui-skills /var/log/josui && \
 
 COPY rootfs/ /
 
-RUN chmod 0755 /usr/local/bin/developer-entrypoint /usr/local/bin/developer-worker-claude \
-        /usr/local/bin/developer-skills-sync \
-        /usr/libexec/developer/seat-state /usr/libexec/developer/ashigaru-hook && \
-    bash -n /usr/local/bin/developer-entrypoint
+RUN chmod 0755 /usr/local/bin/claude-entrypoint /usr/local/bin/claude-worker \
+        /usr/local/bin/claude-skills-sync \
+        /usr/libexec/claude-seat/seat-state /usr/libexec/claude-seat/ashigaru-hook && \
+    bash -n /usr/local/bin/claude-entrypoint
+
+# The names this image had as `developer`, kept as links for one release
+# (#41) so a unit or a person still using them reaches the new ones. The
+# entrypoint finds claude-skills-sync beside readlink -f "$0", the real file,
+# so it behaves the same started by either name. 40-developer-seat.json is
+# NOT kept: two copies of the seat hooks would run every hook twice.
+RUN ln -s claude-entrypoint /usr/local/bin/developer-entrypoint && \
+    ln -s claude-worker /usr/local/bin/developer-worker-claude && \
+    ln -s claude-skills-sync /usr/local/bin/developer-skills-sync && \
+    ln -s claude-seat /usr/libexec/developer && \
+    test -x /usr/local/bin/developer-entrypoint && test -x /usr/libexec/developer/seat-state
 
 # A clone of a crunchtools repo runs pre-commit's hooks with nobody running
 # `pre-commit install` first, so `sdlc commit`'s hooks-installed gate passes on
@@ -206,4 +218,4 @@ ENV HOME=/home/podman \
 USER 1000
 WORKDIR /home/podman
 
-ENTRYPOINT ["/usr/local/bin/developer-entrypoint"]
+ENTRYPOINT ["/usr/local/bin/claude-entrypoint"]
