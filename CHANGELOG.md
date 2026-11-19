@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Gatehouse gates no longer "COULD NOT RUN" on seats whose gateway URL names
+  the gateway over plain http (`http://trentina:8019`, the Vertex seats)
+  (#89). Gatehouse accepts plain http only to a literal private address, so
+  the entrypoint resolves the name once at start and writes the address into
+  `gatehouse.env` when it is private. A name resolving to a public address, or
+  to nothing, is left for Gatehouse to refuse; https and literal addresses are
+  untouched.
+
 ### Changed
 - The container release runs constitution v1.51.0's `container-release.yml`
   (was v1.46.0) and grants it `issues: write`, so a failed scheduled rebuild
