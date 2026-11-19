@@ -74,8 +74,8 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # which is this base's too. A bump is these two lines: the version and the
 # sha256 of that release's fc43 RPM. Only one RPM is installed (noarch, one
 # dist), so one hash covers it.
-ARG ASHIGARU_VERSION=3.3.0
-ARG ASHIGARU_SHA256=23840a7d32f50071021fcc187d38997bd1ddcccded0716a34a930113630f3379
+ARG ASHIGARU_VERSION=4.0.2
+ARG ASHIGARU_SHA256=5a701f901a118bdbd4adbb8921706910267a13d75d1224058d74fbcf784eeb45
 
 USER 0
 

@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [1.17.2] - 2026-11-19
 
+### Changed
+- The Ashigaru CLI moves from 3.3.0 to 4.0.2, matching the Desk. 3.3.0 dropped the
+  fields the 4.x Desk already sends: the seat tally, open count, queue and catch-up.
+
 ### Fixed
 - Gatehouse gates no longer "COULD NOT RUN" on seats whose gateway URL names
   the gateway over plain http (`http://trentina:8019`, the Vertex seats)
