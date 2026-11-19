@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.18.1] - 2026-11-19
+
+### Fixed
+- The Desk's `ashigaru hook next` SessionStart hook also runs on `resume`.
+  Seats restart with `claude --resume`, so with only `startup|clear` no seat
+  asked the Desk for work after a restart. `compact` stays excluded; the Desk
+  only claims for an idle, free seat, so a resumed busy seat is not handed work.
+
 ## [1.18.0] - 2026-11-19
 
 ### Added
