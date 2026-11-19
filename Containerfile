@@ -71,9 +71,10 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # The Ashigaru CLI, whose `ashigaru hook` reports this seat to the Desk. 3.x
 # is a Python package shipped as an RPM on each GitHub release, built on
 # fedora:43 and centos:stream10; the fc43 build is noarch against Python 3.14,
-# which is this base's too. A bump is these two lines: the version and the
-# sha256 of that release's fc43 RPM. Only one RPM is installed (noarch, one
-# dist), so one hash covers it.
+# which is this base's too. A bump is these two lines -- the version and the
+# sha256 of that release's fc43 RPM -- plus the two version pins in the boot
+# gate (.github/workflows/container.yml), which check the image independently.
+# Only one RPM is installed (noarch, one dist), so one hash covers it.
 ARG ASHIGARU_VERSION=4.0.2
 ARG ASHIGARU_SHA256=5a701f901a118bdbd4adbb8921706910267a13d75d1224058d74fbcf784eeb45
 
