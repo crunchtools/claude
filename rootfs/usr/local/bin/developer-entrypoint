@@ -52,6 +52,30 @@ done
 
 mkdir -p "$claude_dir/skills" "$claude_dir/hooks" "$workdir"
 
+# Temporary files go to disk, not to /var/tmp (#92). The seats mount /var/tmp
+# as a 1 GB tmpfs, capped because what is left there is charged to the seat's
+# memory cgroup, and buildah stages image layers in it: a large build fills it
+# and dies "no space left on device". $HOME is the seat's volume on disk.
+# Exported before anything else starts, so the remote-control server, the text
+# session, tmux and a command given as arguments all inherit it.
+#
+# Disk is not emptied at a restart the way a tmpfs is, so what a build left
+# behind more than a day ago is removed here. Anything newer is left alone: a
+# `podman run ... claude auth login` against a running seat's home starts this
+# too, and must not pull a directory out from under a build in progress.
+# A symlink is refused, not followed, for the reason install_gatehouse_env
+# gives: $HOME is writable by the agent.
+seat_tmp=$HOME/tmp
+if [ -L "$seat_tmp" ]; then
+  log "$seat_tmp is a symlink; TMPDIR left as it was"
+elif mkdir -p "$seat_tmp" 2>/dev/null && [ -d "$seat_tmp" ] && [ -w "$seat_tmp" ]; then
+  chmod 0700 "$seat_tmp"
+  find "$seat_tmp" -mindepth 1 -maxdepth 1 -mtime +0 -exec rm -rf {} + 2>/dev/null || true
+  export TMPDIR=$seat_tmp
+else
+  log "cannot create $seat_tmp; TMPDIR left as it was"
+fi
+
 # Identity is copied in, not linked: the mount is read-only and Claude Code
 # rewrites its own settings file. The mounted copy wins again at next start.
 #

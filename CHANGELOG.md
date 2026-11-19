@@ -14,6 +14,14 @@ All notable changes to this project are documented here. The format follows
   never the value (#77).
 
 ### Fixed
+- Seats build large images under `sdlc ci` (#92). /var/tmp on a seat is a
+  1 GB tmpfs and buildah staged layers there, so the memory (torch) and
+  newsletter (Caddy) builds died "no space left on device" and smoke and scan
+  then could not run. The entrypoint now creates `~/tmp` (0700, on the seat's
+  disk volume), exports `TMPDIR` to it, and removes leftovers older than a day
+  at start; a symlinked `~/tmp` is refused. A containers.conf.d drop-in sets
+  `image_copy_tmp_dir = "storage"` for shells from `podman exec`, which never
+  run the entrypoint.
 - `developer-skills-sync` no longer reports `state=current` when this pass's
   fetch failed. A checkout whose fetches always fail (a 401 from GitHub) kept
   comparing HEAD with a stale `origin/main` and read current with `fetched=0`.

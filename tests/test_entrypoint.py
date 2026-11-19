@@ -1189,5 +1189,66 @@ class EntrypointTest(EntrypointCase):
         self.assertFalse((self.home / "agent-args").exists())
 
 
+class TmpdirTest(EntrypointCase):
+    """TMPDIR is on disk, not the seat's 1 GB /var/tmp tmpfs (#92)."""
+
+    def claude_env(self) -> dict[str, str]:
+        lines = (self.home / "claude-env").read_text().splitlines()
+        return dict(line.split("=", 1) for line in lines if "=" in line)
+
+    def test_tmpdir_is_a_private_directory_in_home(self) -> None:
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        seat_tmp = self.home / "tmp"
+        self.assertEqual(self.claude_env().get("TMPDIR"), str(seat_tmp))
+        self.assertEqual(stat.S_IMODE(seat_tmp.stat().st_mode), 0o700)
+
+    def test_a_command_given_as_arguments_gets_it_too(self) -> None:
+        result = self.run_entrypoint("bash", "-c", 'printf %s "$TMPDIR" > "$HOME/tmpdir"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.home / "tmpdir").read_text(), str(self.home / "tmp"))
+
+    def test_leftovers_older_than_a_day_are_removed_and_newer_kept(self) -> None:
+        seat_tmp = self.home / "tmp"
+        old = seat_tmp / "buildah123"
+        (old / "layer").mkdir(parents=True)
+        (old / "layer/blob").write_text("x")
+        new = seat_tmp / "buildah456"
+        new.mkdir()
+        two_days_ago = time.time() - 2 * 86400
+        os.utime(old, (two_days_ago, two_days_ago))
+        self.assertEqual(self.run_entrypoint().returncode, 0)
+        self.assertFalse(old.exists())
+        self.assertTrue(new.exists())
+
+    def test_a_symlinked_tmp_is_refused_not_followed(self) -> None:
+        target = self.root / "elsewhere"
+        target.mkdir()
+        stale = target / "precious"
+        stale.write_text("keep")
+        two_days_ago = time.time() - 2 * 86400
+        os.utime(stale, (two_days_ago, two_days_ago))
+        (self.home / "tmp").symlink_to(target)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("is a symlink; TMPDIR left as it was", result.stderr)
+        self.assertNotEqual(self.claude_env().get("TMPDIR"), str(self.home / "tmp"))
+        self.assertEqual(stale.read_text(), "keep")
+
+    def test_a_tmp_that_cannot_be_a_directory_does_not_stop_the_start(self) -> None:
+        (self.home / "tmp").write_text("a file")
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("TMPDIR left as it was", result.stderr)
+
+    def test_podman_exec_shells_stage_images_in_storage(self) -> None:
+        # A shell from `podman exec` never runs the entrypoint, so the image
+        # tells buildah too: "storage" is the graphroot's tmp, on disk.
+        conf = ENTRYPOINT.parents[3] / "etc/containers/containers.conf.d/50-image-copy-tmp-dir.conf"
+        body = [line.strip() for line in conf.read_text().splitlines() if not line.startswith("#")]
+        self.assertIn("[engine]", body)
+        self.assertIn('image_copy_tmp_dir = "storage"', body)
+
+
 if __name__ == "__main__":
     unittest.main()
