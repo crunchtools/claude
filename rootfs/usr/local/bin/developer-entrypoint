@@ -356,6 +356,48 @@ install_mcp_env() {
   log "installed $found env file(s) from $src"
 }
 
+# Gatehouse takes plain http only to `localhost` or a LITERAL private address
+# (gatehouse/llm.py `_is_private`), and refuses a name on purpose: it cannot
+# know where a name resolves. The seat units name the gateway on the container
+# bridge (`http://trentina:8019/...`), so that URL made every gate "COULD NOT
+# RUN" (crunchtools/developer#89).
+#
+# So the name is resolved here, once, at start, and replaced by its address --
+# but only when that address is one Gatehouse would accept anyway. A name that
+# resolves to a public address, or not at all, is left as it was: Gatehouse
+# then refuses it and says why, which is the honest outcome, and this never
+# turns plaintext to a public host into something Gatehouse lets through.
+# https and literal addresses pass through untouched.
+pin_private_http_host() {
+  local url=$1 rest authority host port address=
+  case $url in
+    http://*) ;;
+    *) printf '%s\n' "$url"; return 0 ;;
+  esac
+  rest=${url#http://}
+  authority=${rest%%/*}
+  host=${authority%%:*}
+  port=${authority#"$host"}
+  # Only a name is resolved: localhost and an IPv6 literal are already what
+  # Gatehouse accepts or refuses on its own, and so is a dotted address.
+  case $host in
+    localhost | \[* | "") printf '%s\n' "$url"; return 0 ;;
+    *[!0-9.]*) ;;
+    *) printf '%s\n' "$url"; return 0 ;;
+  esac
+  read -r address _ < <(getent ahostsv4 "$host" 2> /dev/null)
+  case $address in
+    10.* | 127.* | 192.168.* | 169.254.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[01].*)
+      log "gateway host $host resolves to $address; Gatehouse gets the address"
+      printf '%s\n' "http://$address$port${rest#"$authority"}"
+      ;;
+    *)
+      log "gateway host $host resolves to '${address:-nothing}', not a private address; Gatehouse will refuse plain http to it"
+      printf '%s\n' "$url"
+      ;;
+  esac
+}
+
 # Gatehouse through the gateway, not straight to OpenRouter.
 #
 # Gatehouse reads ~/.config/mcp-env/gatehouse.env and needs an LLM. Pointed at
@@ -422,6 +464,7 @@ install_gatehouse_env() {
     # independently could redirect that token to an endpoint of its choosing.
     # Gatehouse's own review of this change raised exactly that, correctly.
     url="${TRENTINA_MCP_URL%%/gateway/*}/proxy/llm/openrouter-gatehouse/v1"
+    url=$(pin_private_http_host "$url")
   fi
   if [ -z "${gateway_token:-}" ] || [ -z "$url" ]; then
     # No gateway identity: leave whatever the mount provided. A seat without a

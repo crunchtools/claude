@@ -618,6 +618,66 @@ class EntrypointTest(EntrypointCase):
         # exists in a seat any more (RT#1559).
         self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
 
+    def fake_getent(self, address: str) -> pathlib.Path:
+        """A stand-in getent that resolves every name to `address`, and logs the call."""
+        fake = pathlib.Path(self.env["PATH"].split(os.pathsep)[0]) / "getent"
+        body = '[ -n "$1" ] || exit 2\necho "$@" >> "$HOME/getent-calls"\n'
+        if address:
+            body += f'echo "{address}      STREAM $2"\n'
+        else:
+            body += "exit 2\n"
+        fake.write_text("#!/bin/bash\n" + body)
+        fake.chmod(0o755)
+        return self.home / "getent-calls"
+
+    def gatehouse_url_for(self, mcp_url: str) -> tuple[str, str]:
+        env = {**self.env, "TRENTINA_MCP_URL": mcp_url}
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        line = next(x for x in body.splitlines() if x.startswith("GATEHOUSE_LLM_BASE_URL="))
+        return line.split("=", 1)[1], result.stderr
+
+    def test_a_named_gateway_on_plain_http_gets_its_private_address(self) -> None:
+        """Gatehouse refuses a name over plain http (#89), so it gets the address."""
+        self.fake_getent("10.89.0.50")
+        url, stderr = self.gatehouse_url_for("http://trentina:8019/gateway/agent1/mcp")
+        self.assertEqual(url, "http://10.89.0.50:8019/proxy/llm/openrouter-gatehouse/v1")
+        self.assertIn("resolves to 10.89.0.50", stderr)
+
+    def test_a_named_gateway_resolving_public_is_left_for_gatehouse_to_refuse(self) -> None:
+        """Pinning a public address would hand plaintext a pass Gatehouse denies."""
+        self.fake_getent("203.0.113.7")
+        url, stderr = self.gatehouse_url_for("http://trentina:8019/gateway/agent1/mcp")
+        self.assertEqual(url, "http://trentina:8019/proxy/llm/openrouter-gatehouse/v1")
+        self.assertIn("resolves to '203.0.113.7', not a private address", stderr)
+
+    def test_a_named_gateway_that_does_not_resolve_is_left_alone(self) -> None:
+        self.fake_getent("")
+        url, stderr = self.gatehouse_url_for("http://trentina:8019/gateway/agent1/mcp")
+        self.assertEqual(url, "http://trentina:8019/proxy/llm/openrouter-gatehouse/v1")
+        self.assertIn("resolves to 'nothing'", stderr)
+
+    def test_https_and_literal_addresses_are_not_resolved(self) -> None:
+        calls = self.fake_getent("10.0.0.1")
+        for mcp_url, expected in (
+            (
+                "https://trentina.example.com/gateway/agent1/mcp",
+                "https://trentina.example.com/proxy/llm/openrouter-gatehouse/v1",
+            ),
+            (
+                "http://192.168.1.5:8019/gateway/agent1/mcp",
+                "http://192.168.1.5:8019/proxy/llm/openrouter-gatehouse/v1",
+            ),
+            (
+                "http://localhost:8019/gateway/agent1/mcp",
+                "http://localhost:8019/proxy/llm/openrouter-gatehouse/v1",
+            ),
+        ):
+            url, _ = self.gatehouse_url_for(mcp_url)
+            self.assertEqual(url, expected)
+        self.assertFalse(calls.exists())
+
     def test_a_mounted_gatehouse_env_wins(self) -> None:
         """Deleting the mounted key is the cutover, so a present one wins.
 
