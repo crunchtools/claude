@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-19
+
+### Added
+- Seats can be handed work by the Desk itself: a SessionStart hook (startup and
+  `/clear`, async with `asyncRewake`) runs `ashigaru hook next`, which waits for
+  the Desk to assign this free seat an item and wakes the session with Prime's
+  brief. Nothing flows until the Desk's `autodispatch` mark is `on`.
+
+### Changed
+- The Ashigaru CLI moves from 4.0.2 to 4.2.0: bare `ashigaru work` is the seat
+  board, with `--markdown` and `--wide`.
+
 ## [1.17.2] - 2026-11-19
 
 ### Changed
