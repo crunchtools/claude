@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Constitution 3.1.0: Attended mode names Josui Prime's brief through the
+  Ashigaru Desk as a sanctioned input, gated by `autodispatch` and an idle,
+  free seat. Docs only. #101
+
 ## [1.18.1] - 2026-11-19
 
 ### Fixed
