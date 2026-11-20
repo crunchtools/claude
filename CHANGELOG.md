@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-11-20
+
+### Changed
+- Ashigaru CLI 5.0.1 -> 5.1.0. Seats keep no local Ashigaru state: every request
+  names its Claude Code session, so a seat whose `~/.local` is not writable no
+  longer drops off the Desk board. Needs the 5.1.0 Desk, which is deployed.
+
 ## [1.19.1] - 2026-11-20
 
 ### Fixed
