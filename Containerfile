@@ -58,9 +58,9 @@
 FROM quay.io/podman/stable@sha256:0ccbc4e7f79f9c33e7fc959be59f714abbc0f4c9cffbe14f5bceff537a014738
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.18.2"
+LABEL version="1.19.0"
 # The base sets this to its own release; the image reports ours.
-LABEL org.opencontainers.image.version="1.18.2"
+LABEL org.opencontainers.image.version="1.19.0"
 LABEL description="developer - a crunchtools development agent: Claude Code with a toolchain and nested podman"
 
 # The same versions the production image runs. A new Claude Code or
@@ -75,8 +75,8 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # sha256 of that release's fc43 RPM -- plus the two version pins in the boot
 # gate (.github/workflows/container.yml), which check the image independently.
 # Only one RPM is installed (noarch, one dist), so one hash covers it.
-ARG ASHIGARU_VERSION=4.2.0
-ARG ASHIGARU_SHA256=b91ac0c9392eadcaab7b51ecd91debefb57bafc919fbe922fbe3f66308aa3bff
+ARG ASHIGARU_VERSION=5.0.0
+ARG ASHIGARU_SHA256=a25a61946d48f7259b5c26cb74ae2ce08809ec72a40d5f4d6c2aaadc8dcfa343
 
 USER 0
 

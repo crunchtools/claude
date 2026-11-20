@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-20
+
+### Changed
+- Ashigaru CLI 4.2.0 -> 5.0.0. The seat hooks register each Claude Code session
+  with the Desk and send its epoch and session on every request, so the Desk
+  refuses writes from a session it has ended or replaced; CLI writes carry the
+  item version (If-Match). Needs the 5.0.0 Desk, which is deployed.
+
 ## [1.18.2] - 2026-11-19
 
 ### Changed
