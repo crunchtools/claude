@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.19.1] - 2026-11-20
+
+### Fixed
+- Ashigaru CLI 5.0.0 -> 5.0.1. An idle seat stays on the Desk board instead of
+  showing `missing`: `ashigaru hook next` keeps checking in every 3 minutes
+  rather than exiting when the Desk says the seat cannot take work.
+
 ## [1.19.0] - 2026-11-20
 
 ### Changed
