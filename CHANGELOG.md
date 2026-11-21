@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-11-21
+
+### Fixed
+- Ashigaru CLI 5.1.0 -> 5.2.0. Prime can no longer hand an item to one seat
+  while another seat's hook has already claimed it: create-and-assign is one
+  request, and an assign over a held item is refused. Needs the 5.2.0 Desk,
+  which is deployed.
+
 ## [1.20.0] - 2026-11-20
 
 ### Changed
