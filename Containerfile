@@ -75,8 +75,8 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # sha256 of that release's fc43 RPM -- plus the two version pins in the boot
 # gate (.github/workflows/container.yml), which check the image independently.
 # Only one RPM is installed (noarch, one dist), so one hash covers it.
-ARG ASHIGARU_VERSION=5.1.0
-ARG ASHIGARU_SHA256=b75f669c1c7196ce0a2bbb628af72affebd0847b330d909cf51e35247e47bc0a
+ARG ASHIGARU_VERSION=5.2.0
+ARG ASHIGARU_SHA256=c4abece15403936a26085a8f3f8b90b8dddf02e43e0c2298e1286c902e8c16a6
 
 USER 0
 
