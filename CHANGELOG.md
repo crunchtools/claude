@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The entrypoint now says what the gateway-address pin (#89) needs from the
+  host: the gateway container keeps a fixed bridge address. Resolved once at
+  seat start, an address that moves on a gateway restart breaks every seat's
+  pre-push Gatehouse until the seat restarts. Dolza's gateway is now pinned.
+
 ## [1.22.0] - 2026-11-21
 
 ### Changed
