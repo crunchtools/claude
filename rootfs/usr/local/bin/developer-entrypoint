@@ -368,6 +368,11 @@ install_mcp_env() {
 # then refuses it and says why, which is the honest outcome, and this never
 # turns plaintext to a public host into something Gatehouse lets through.
 # https and literal addresses pass through untouched.
+#
+# Resolved once means frozen for the seat's life, so the gateway must keep a
+# FIXED address on the bridge (`Network=crunchtools:ip=...` in its quadlet).
+# On Dolza it did not: a gateway restart moved it from .55 to .58 and every
+# seat's pre-push gate failed to connect until the seat restarted too (a813).
 pin_private_http_host() {
   local url=$1 rest authority host port address=
   case $url in
