@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-21
+
+### Changed
+
+- Ashigaru CLI 5.2.0 -> 5.3.0. The /ashigaru skill text now treats Renovate
+  PRs like Dependabot's; pairs with the 5.3.0 Desk.
+
 ## [1.21.0] - 2026-11-21
 
 ### Fixed
