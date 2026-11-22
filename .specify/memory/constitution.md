@@ -1,6 +1,6 @@
 # developer Constitution
 
-> **Version:** 3.1.0
+> **Version:** 3.2.0
 > **Ratified:** 2026-11-06
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.46.0
@@ -149,7 +149,7 @@ from the `--debug-file`, not inferred.
 The agent needs one credential: the gateway's bearer token, from the env file.
 It is what the gateway identifies this seat by.
 
-A second one is on its way out — an OpenRouter API key for
+A second one was on its way out — an OpenRouter API key for
 Gatehouse, the gate that reviews code with an LLM, mounted at
 `/etc/josui/mcp-env` because `envscrub` would strip it from the environment
 and the gate would then die reporting that it could not run.
@@ -175,13 +175,18 @@ would send the gateway token to openrouter.ai as an OpenRouter key. A seat
 with no gateway token or URL also leaves the mount alone, because failing
 there would take away the only Gatehouse such a seat could run.
 
-Removing the mounted key removes the one credential that lives outside the
-gateway. Its route never was — `openrouter.ai` is on this profile's egress
-allowlist and the proxy carries the traffic — but the key is a second,
-spendable copy of one the gateway already holds, with no per-seat accounting
-and no revocation short of editing files on the host. The `openrouter.ai`
-grant comes off this profile's allowlist with it, and until both happen Layer
-5 names two credentials rather than one (RT#1559).
+The owner reversed RT#1559's direction for Gatehouse (a968): through the
+gateway, every local review is L3-judged by Trentina and paid for twice. So a
+seat may hold one more credential, its host's own capped OpenRouter key,
+mounted read-only at `/run/secrets/gatehouse-openrouter-key` on any seat
+class. When it is there it wins over the gateway route and a mounted
+`gatehouse.env`, and Gatehouse calls `https://openrouter.ai/api/v1` directly.
+The key stays a file all the way down: `gatehouse.env` carries only its path
+as `OPENROUTER_API_KEY_FILE`, and `sdlc` mounts that path read-only into the
+gate container, so the key is never an environment value anywhere. Spend is
+accounted per host and revoked by removing one mount. Without the mount, the
+gateway route above is unchanged, and `openrouter.ai` stays on this profile's
+egress allowlist for it.
 
 Gatehouse sends `provider: {"zdr": true, "data_collection": "deny"}` on every
 request, because the diff it reviews is private code. Through the gateway that
@@ -282,5 +287,6 @@ crunchtools/nagios-agent compares the two containers' start times and says so.
 | 1.2.0 | 2026-11-06 | `sdlc` on PATH, resolving the rev the repo pins rather than any default, so a gate run by hand is the same tool CI runs. RT#1556 |
 | 1.1.0 | 2026-11-06 | A seat's `sdlc push` prerequisites move into the image: a git identity from the environment, and tool API keys from a read-only mcp-env mount. Layer 5 now names two credentials rather than one. Measured: 293s for trentina's push tier in a seat against 416s on the laptop. RT#1556 |
 | 1.0.0 | 2026-11-06 | Extracted from josui 0.8.0, where this image was `Containerfile.dev`. Carries the measurements that justify its deviations: the five-capability set, `label=disable` with no AVC to replace it, `unmask=/proc/*`, the unprivileged UID map, and the fact that liveness is not monitorable from inside. RT#1556 |
+| 3.2.0 | 2026-11-22 | Layer 5: a seat may hold its host's own capped OpenRouter key for Gatehouse, a read-only file at `/run/secrets/gatehouse-openrouter-key` that wins over the gateway route and is only ever passed as a path. MINOR: a sanctioned credential, no boundary removed. a968 |
 | 3.1.0 | 2026-11-19 | Attended mode names Josui Prime's brief through the Ashigaru Desk as a sanctioned input, gated by the Desk's `autodispatch` mark and an idle, free seat. MINOR: a new sanctioned input, no boundary removed. developer#101 |
 | 3.0.0 | 2026-11-14 | A third role, Dolza admin seats (Dolza (Vertex) 1-4, Dolza (Max) 1-4): own ssh key each to Breetai, Gloval, Dolza and Exedore, on tmpfs, `from=` dolza, revocable per seat. The Dolza pod is one trust domain. Workers are now the Exedore seats only. MAJOR because "a worker never gets production reach or Prime's token" stops being true on Dolza |
