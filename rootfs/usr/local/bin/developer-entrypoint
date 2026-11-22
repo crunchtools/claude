@@ -473,7 +473,8 @@ install_gatehouse_env() {
   local dest="$HOME/.config/mcp-env" file="$HOME/.config/mcp-env/gatehouse.env"
   local keyfile=${JOSUI_GATEHOUSE_KEY_FILE:-/run/secrets/gatehouse-openrouter-key}
   local direct=""
-  if [ -e "$keyfile" ]; then
+  # A dangling symlink fails -e, and would otherwise fall back unexplained.
+  if [ -e "$keyfile" ] || [ -L "$keyfile" ]; then
     if ! [[ "$keyfile" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
       log "$keyfile is not a plain absolute path; using the gateway route"
     elif ! [ -f "$keyfile" ] || ! [ -r "$keyfile" ] || ! [ -s "$keyfile" ]; then
@@ -547,7 +548,8 @@ install_gatehouse_env() {
   # other and never a half-written one. mktemp creates at 0600 whatever the
   # umask is, which is the other half of the token never being readable.
   # -T, because without it a destination that is a symlink to a directory is
-  # followed, and the token lands inside whatever it points at.
+  # followed, and the token lands inside whatever it points at. With it, a real
+  # directory there makes the rename fail, and that must not stop the seat.
   local tmp
   tmp=$(mktemp "$dest/.gatehouse.env.XXXXXX") || {
     log "cannot create a temporary file in $dest; gatehouse.env not written"
@@ -571,7 +573,11 @@ GATEHOUSE_LLM_BASE_URL=$url
 OPENROUTER_API_KEY=$gateway_token
 ENVEOF
   fi
-  mv -fT "$tmp" "$file"
+  mv -fT "$tmp" "$file" || {
+    log "cannot replace $file; gatehouse.env not written"
+    rm -f "$tmp"
+    return 0
+  }
   if [ -n "$direct" ]; then
     log "gatehouse.env points straight at OpenRouter, key file $keyfile"
   else

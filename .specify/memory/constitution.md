@@ -147,7 +147,8 @@ from the `--debug-file`, not inferred.
 ## Layer 5 — Credential & Identity Management
 
 The agent needs one credential: the gateway's bearer token, from the env file.
-It is what the gateway identifies this seat by.
+It is what the gateway identifies this seat by. A seat whose host mounts a
+Gatehouse key holds a second, described below.
 
 A second one was on its way out — an OpenRouter API key for
 Gatehouse, the gate that reviews code with an LLM, mounted at

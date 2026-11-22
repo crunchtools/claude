@@ -820,6 +820,25 @@ class EntrypointTest(EntrypointCase):
         self.assertEqual(list(trap.iterdir()), [])
         self.assertFalse((dest / "gatehouse.env").is_symlink())
 
+    def test_a_gatehouse_env_that_is_a_directory_is_reported_not_fatal(self) -> None:
+        """-T makes the rename fail here; the seat still starts, with no token left behind."""
+        dest = self.home / ".config/mcp-env"
+        (dest / "gatehouse.env").mkdir(parents=True)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("gatehouse.env not written", result.stderr)
+        self.assertEqual(list((dest / "gatehouse.env").iterdir()), [])
+        self.assertEqual(list(dest.glob(".gatehouse.env.*")), [])
+
+    def test_a_dangling_key_symlink_keeps_the_gateway_route_and_says_so(self) -> None:
+        keyfile = self.root / "key-link"
+        keyfile.symlink_to(self.root / "missing")
+        result = self.run_entrypoint(env={**self.env, "JOSUI_GATEHOUSE_KEY_FILE": str(keyfile)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+        self.assertIn("not a readable, non-empty file", result.stderr)
+
     def direct_key_env(self, key: str = "sk-or-v1-abc123\n", name: str = "key") -> dict[str, str]:
         keyfile = self.root / name
         keyfile.write_text(key)
