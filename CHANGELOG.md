@@ -13,6 +13,17 @@ All notable changes to this project are documented here. The format follows
   README.md's "How to release" has the steps. The constitution's "no tag
   release" now says what it meant: no tag-triggered build. A tag marks a
   version and builds nothing.
+- Gatehouse calls OpenRouter directly when the host mounts its own capped key
+  at `/run/secrets/gatehouse-openrouter-key` (a968), so a local review is no
+  longer L3-judged by Trentina and paid for twice. `gatehouse.env` names the
+  file as `OPENROUTER_API_KEY_FILE` and never holds the key; it needs
+  crunchtools/sdlc 0.12.0 to mount the file into the gate. With no key file the
+  gateway route is unchanged.
+
+### Fixed
+
+- `gatehouse.env` planted as a symlink to a directory no longer takes the
+  gateway token inside that directory: the rename is `mv -T`.
 
 ### Changed
 

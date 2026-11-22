@@ -403,7 +403,7 @@ pin_private_http_host() {
   esac
 }
 
-# Gatehouse through the gateway, not straight to OpenRouter.
+# Gatehouse through the gateway, unless this seat has its own key (below).
 #
 # Gatehouse reads ~/.config/mcp-env/gatehouse.env and needs an LLM. Pointed at
 # openrouter.ai it needs an OpenRouter key of its own, and that key was mounted
@@ -454,8 +454,35 @@ pin_private_http_host() {
 # verbatim, so the guarantee survives the move -- verified 2026-11-07 against
 # the live gateway, which returned 200 rather than refusing it as an unknown
 # parameter. If that shape ever narrows, this route stops being safe to use.
+#
+# Straight to OpenRouter, when the host mounts its own capped key (a968). The
+# gateway route has every review L3-judged by Trentina and paid for twice, and
+# seats reach openrouter.ai themselves. Any seat with the file uses it, Dolza's
+# and Exedore's alike. It wins over the gateway route and a mounted
+# gatehouse.env; with no file, nothing below changes.
+#
+# The key stays a file all the way down and this never reads it: gatehouse.env
+# carries only its path as OPENROUTER_API_KEY_FILE, which Gatehouse (0.9.0+)
+# reads in preference to OPENROUTER_API_KEY, and sdlc mounts that path
+# read-only into the gate container (crunchtools/sdlc 0.12.0+). A repo pinned to an
+# older python-sdlc mounts nothing, and its Gatehouse fails on the missing
+# file -- so mounting the key on a seat is the cutover, once the repos that
+# seat pushes have moved. The path is written into an env file and becomes a
+# -v argument there, so it is held to plain path characters.
 install_gatehouse_env() {
   local dest="$HOME/.config/mcp-env" file="$HOME/.config/mcp-env/gatehouse.env"
+  local keyfile=${JOSUI_GATEHOUSE_KEY_FILE:-/run/secrets/gatehouse-openrouter-key}
+  local direct=""
+  # A dangling symlink fails -e, and would otherwise fall back unexplained.
+  if [ -e "$keyfile" ] || [ -L "$keyfile" ]; then
+    if ! [[ "$keyfile" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+      log "$keyfile is not a plain absolute path; using the gateway route"
+    elif ! [ -f "$keyfile" ] || ! [ -r "$keyfile" ] || ! [ -s "$keyfile" ]; then
+      log "$keyfile is mounted but is not a readable, non-empty file; using the gateway route"
+    else
+      direct=1
+    fi
+  fi
   # The MOUNT decides, never the destination. $HOME is a persistent volume, so
   # a gatehouse.env in $dest may be one THIS function wrote at a previous
   # start -- and testing the destination would then read its own output as an
@@ -463,7 +490,9 @@ install_gatehouse_env() {
   # Gatehouse's review of the first version of this caught exactly that.
   local mounted="$config_dir/mcp-env/gatehouse.env"
   local url=""
-  if [ -n "${TRENTINA_MCP_URL:-}" ]; then
+  if [ -n "$direct" ]; then
+    url=https://openrouter.ai/api/v1
+  elif [ -n "${TRENTINA_MCP_URL:-}" ]; then
     # Derived from the MCP endpoint, never settable on its own. This file
     # carries the gateway token, so anything able to set the URL
     # independently could redirect that token to an endpoint of its choosing.
@@ -471,14 +500,15 @@ install_gatehouse_env() {
     url="${TRENTINA_MCP_URL%%/gateway/*}/proxy/llm/openrouter-gatehouse/v1"
     url=$(pin_private_http_host "$url")
   fi
-  if [ -z "${gateway_token:-}" ] || [ -z "$url" ]; then
+  if [ -n "$direct" ]; then
+    : # the mounted key decides; a mounted gatehouse.env is replaced
+  elif [ -z "${gateway_token:-}" ] || [ -z "$url" ]; then
     # No gateway identity: leave whatever the mount provided. A seat without a
     # token cannot use the gateway route at all, and failing here would take
     # away the only Gatehouse this seat can run.
     log "no gateway token or URL; gatehouse.env left as mounted"
     return 0
-  fi
-  if [ -f "$mounted" ]; then
+  elif [ -f "$mounted" ]; then
     # Loud, because a key left in the mount keeps a seat off the gateway route
     # indefinitely and nothing else would say so.
     log "gatehouse.env is mounted; NOT using the gateway route (RT#1559)"
@@ -517,6 +547,9 @@ install_gatehouse_env() {
   # atomic, so a gate reading this file concurrently sees one version or the
   # other and never a half-written one. mktemp creates at 0600 whatever the
   # umask is, which is the other half of the token never being readable.
+  # -T, because without it a destination that is a symlink to a directory is
+  # followed, and the token lands inside whatever it points at. With it, a real
+  # directory there makes the rename fail, and that must not stop the seat.
   local tmp
   tmp=$(mktemp "$dest/.gatehouse.env.XXXXXX") || {
     log "cannot create a temporary file in $dest; gatehouse.env not written"
@@ -525,14 +558,31 @@ install_gatehouse_env() {
   # Rewritten at every start, replacing whatever a previous start left: the
   # seat token rotates, and a stale one is a gate that fails rather than one
   # that could not run.
-  cat > "$tmp" <<ENVEOF
+  if [ -n "$direct" ]; then
+    cat > "$tmp" <<ENVEOF
+# Written by developer-entrypoint at container start. Do not edit: it is
+# replaced on every start. See a968 in the README.
+GATEHOUSE_LLM_BASE_URL=$url
+OPENROUTER_API_KEY_FILE=$keyfile
+ENVEOF
+  else
+    cat > "$tmp" <<ENVEOF
 # Written by developer-entrypoint at container start. Do not edit: it is
 # replaced on every start. See RT#1559.
 GATEHOUSE_LLM_BASE_URL=$url
 OPENROUTER_API_KEY=$gateway_token
 ENVEOF
-  mv -f "$tmp" "$file"
-  log "gatehouse.env points at the gateway: $url"
+  fi
+  mv -fT "$tmp" "$file" || {
+    log "cannot replace $file; gatehouse.env not written"
+    rm -f "$tmp"
+    return 0
+  }
+  if [ -n "$direct" ]; then
+    log "gatehouse.env points straight at OpenRouter, key file $keyfile"
+  else
+    log "gatehouse.env points at the gateway: $url"
+  fi
 }
 
 set_git_identity

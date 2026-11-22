@@ -107,6 +107,9 @@ class EntrypointCase(unittest.TestCase):
             "TRENTINA_MCP_URL": "http://192.0.2.2:8019/gateway/agent1/mcp",
             "TRENTINA_MCP_TOKEN": "s3cret-token",
             "TRENTINA_GIT_URL": "http://192.0.2.2:8019/git/",
+            # Never the real /run/secrets: a seat that has its key mounted
+            # would otherwise flip every gateway-route test here.
+            "JOSUI_GATEHOUSE_KEY_FILE": str(self.root / "no-gatehouse-key"),
         }
 
     def run_entrypoint(
@@ -804,6 +807,109 @@ class EntrypointTest(EntrypointCase):
             "OPENROUTER_API_KEY=sk-raw\n",
         )
         self.assertIn("left as mounted", result.stderr)
+
+    def test_a_gatehouse_env_symlinked_to_a_directory_is_replaced_not_followed(self) -> None:
+        """Without mv -T a link to a directory takes the token inside it."""
+        dest = self.home / ".config/mcp-env"
+        dest.mkdir(parents=True)
+        trap = self.home / "trap"
+        trap.mkdir()
+        (dest / "gatehouse.env").symlink_to(trap)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(list(trap.iterdir()), [])
+        self.assertFalse((dest / "gatehouse.env").is_symlink())
+
+    def test_a_gatehouse_env_that_is_a_directory_is_reported_not_fatal(self) -> None:
+        """-T makes the rename fail here; the seat still starts, with no token left behind."""
+        dest = self.home / ".config/mcp-env"
+        (dest / "gatehouse.env").mkdir(parents=True)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("gatehouse.env not written", result.stderr)
+        self.assertEqual(list((dest / "gatehouse.env").iterdir()), [])
+        self.assertEqual(list(dest.glob(".gatehouse.env.*")), [])
+
+    def test_a_dangling_key_symlink_keeps_the_gateway_route_and_says_so(self) -> None:
+        keyfile = self.root / "key-link"
+        keyfile.symlink_to(self.root / "missing")
+        result = self.run_entrypoint(env={**self.env, "JOSUI_GATEHOUSE_KEY_FILE": str(keyfile)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+        self.assertIn("not a readable, non-empty file", result.stderr)
+
+    def direct_key_env(self, key: str = "sk-or-v1-abc123\n", name: str = "key") -> dict[str, str]:
+        keyfile = self.root / name
+        keyfile.write_text(key)
+        keyfile.chmod(0o400)
+        return {**self.env, "JOSUI_GATEHOUSE_KEY_FILE": str(keyfile)}
+
+    def test_a_mounted_key_file_goes_straight_to_openrouter_as_a_path(self) -> None:
+        """a968: the key stays a file; gatehouse.env names it and never holds it."""
+        env = self.direct_key_env()
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        written = self.home / ".config/mcp-env/gatehouse.env"
+        body = written.read_text()
+        self.assertIn("GATEHOUSE_LLM_BASE_URL=https://openrouter.ai/api/v1\n", body)
+        self.assertIn(f"OPENROUTER_API_KEY_FILE={env['JOSUI_GATEHOUSE_KEY_FILE']}\n", body)
+        self.assertNotIn("OPENROUTER_API_KEY=", body)
+        self.assertNotIn("sk-or-v1-abc123", body)
+        self.assertNotIn("s3cret-token", body)
+        self.assertNotIn("sk-or-v1-abc123", result.stderr + result.stdout)
+        self.assertEqual(stat.S_IMODE(written.stat().st_mode), 0o600)
+        self.assertIn("straight at OpenRouter", result.stderr)
+
+    def test_a_mounted_key_file_beats_a_mounted_gatehouse_env(self) -> None:
+        src = self.config / "mcp-env"
+        src.mkdir()
+        (src / "gatehouse.env").write_text("OPENROUTER_API_KEY=sk-raw\n")
+        result = self.run_entrypoint(env=self.direct_key_env())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY_FILE=", body)
+        self.assertNotIn("sk-raw", body)
+
+    def test_a_mounted_key_file_needs_no_gateway(self) -> None:
+        env = {
+            k: v
+            for k, v in self.direct_key_env().items()
+            if k not in ("TRENTINA_MCP_TOKEN", "TRENTINA_MCP_URL")
+        }
+        result = self.run_entrypoint(env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("GATEHOUSE_LLM_BASE_URL=https://openrouter.ai/api/v1\n", body)
+
+    def test_an_unusable_key_file_keeps_the_gateway_route(self) -> None:
+        """Empty, or a path sdlc could not mount: the gateway, and say why."""
+        for key, name in (("", "empty-key"), ("sk-or-v1-abc123", "a:b,c")):
+            with self.subTest(name=name):
+                result = self.run_entrypoint(env=self.direct_key_env(key, name))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+                self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+                self.assertNotIn("OPENROUTER_API_KEY_FILE", body)
+                self.assertIn("using the gateway route", result.stderr)
+
+    def test_a_key_path_that_is_a_directory_keeps_the_gateway_route(self) -> None:
+        keydir = self.root / "key-dir"
+        keydir.mkdir()
+        result = self.run_entrypoint(env={**self.env, "JOSUI_GATEHOUSE_KEY_FILE": str(keydir)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+        self.assertIn("not a readable, non-empty file", result.stderr)
+
+    def test_removing_the_key_file_returns_to_the_gateway_route(self) -> None:
+        """Rollback is unmounting the key."""
+        self.assertEqual(self.run_entrypoint(env=self.direct_key_env()).returncode, 0)
+        result = self.run_entrypoint()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+        self.assertNotIn("OPENROUTER_API_KEY_FILE", body)
 
     def test_no_env_dir_still_writes_the_gateway_gatehouse_env(self) -> None:
         self.assertEqual(self.run_entrypoint().returncode, 0)
