@@ -874,6 +874,15 @@ class EntrypointTest(EntrypointCase):
                 self.assertNotIn("OPENROUTER_API_KEY_FILE", body)
                 self.assertIn("using the gateway route", result.stderr)
 
+    def test_a_key_path_that_is_a_directory_keeps_the_gateway_route(self) -> None:
+        keydir = self.root / "key-dir"
+        keydir.mkdir()
+        result = self.run_entrypoint(env={**self.env, "JOSUI_GATEHOUSE_KEY_FILE": str(keydir)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = (self.home / ".config/mcp-env/gatehouse.env").read_text()
+        self.assertIn("OPENROUTER_API_KEY=s3cret-token\n", body)
+        self.assertIn("not a readable, non-empty file", result.stderr)
+
     def test_removing_the_key_file_returns_to_the_gateway_route(self) -> None:
         """Rollback is unmounting the key."""
         self.assertEqual(self.run_entrypoint(env=self.direct_key_env()).returncode, 0)
