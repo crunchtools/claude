@@ -29,3 +29,11 @@ file = "rootfs/usr/local/bin/developer-skills-sync"
 evidence = "tmp=$(mktemp \"$status_file.XXXXXX\") || { log \"cannot write $status_file\"; exit 0; }"
 status = "not-a-bug"
 reason = "By design and documented in the header: a failed step is reported on stderr and the pass exits 0, because the entrypoint runs it at start under set -e and in the background loop, where a non-zero exit must not stop the seat. skills-sync-push is a one-shot unit whose failure systemd should record, so it exits 1."
+
+[[findings]]
+agent = "constitution"
+category = "security"
+file = "rootfs/usr/local/bin/developer-entrypoint"
+evidence = "local keyfile=${JOSUI_GATEHOUSE_KEY_FILE:-/run/secrets/gatehouse-openrouter-key}"
+status = "not-a-bug"
+reason = "Only the host unit sets the seat's environment, and that unit already chooses every mount and secret the seat has, so the override grants nothing it lacks. It is the same test seam as JOSUI_SSH_DIR, and it keeps the tests off the real /run/secrets."

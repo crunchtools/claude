@@ -37,3 +37,11 @@ check = "EV003-test_skip_evasion"
 path = "tests/test_entrypoint_unreadable.py"
 justification = "Root reads through the 0000 mode the test uses to make the token file unreadable, and nothing short of a privileged mount changes that; the test runs for every non-root user."
 classification = "by_design"
+
+# Ledger entries quote the code they judge verbatim, and Gatehouse matches the
+# quote against the diff, so a path in the code is a path in the ledger.
+[[exceptions]]
+check = "CH001-absolute_paths"
+path = "gatehouse-findings.toml"
+justification = "Evidence strings must quote the judged code exactly for Gatehouse to match them, so absolute paths in that code appear here verbatim."
+classification = "by_design"
