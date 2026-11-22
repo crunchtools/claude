@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `release.yml`, so a release cut by hand is tagged by the Ashigaru app, the
+  only actor the cosign release-tag ruleset lets create `v*.*.*` tags (a965).
+  README.md's "How to release" has the steps. The constitution's "no tag
+  release" now says what it meant: no tag-triggered build. A tag marks a
+  version and builds nothing.
+
 ### Changed
 
 - The entrypoint now says what the gateway-address pin (#89) needs from the

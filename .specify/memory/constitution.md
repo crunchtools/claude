@@ -110,8 +110,10 @@ start, replacing whatever was there.
 - **Vulnerability scanning:** none at build time; published images are scanned on a schedule by the fleet CVE check (grype + Nagios), which pages on a new fixable Critical (constitution 1.40.0, RT #1551). SBOM (SPDX) per
   build. The OS layer's control is `dnf -y upgrade` in the Containerfile plus
   the weekly `parent-image-updated` rebuild.
-- **No `schedule:` trigger** and no tag release: this is a build machine for
-  agents, not a shipped artifact, so it tracks main and the fleet's pulse.
+- **No `schedule:` trigger** and no tag-triggered build: this is a build
+  machine for agents, not a shipped artifact, so it tracks main and the fleet's
+  pulse. A `v*` tag only marks a version, and only the Ashigaru app makes one
+  (`release.yml`; the cosign release-tag ruleset refuses anyone else).
 - **Runtime:** UID 1000 mapped to an **unprivileged host range**, never to host
   root; `--read-only` with tmpfs on `/tmp`, `/var/tmp` and `/run`; the nested
   engine's storage on a volume of its own; an internal network with

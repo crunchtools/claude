@@ -193,6 +193,20 @@ python3 -m unittest discover -s tests -v
 
 The image is built by GitHub Actions only.
 
+## How to release
+
+Only the Ashigaru app may create `v*.*.*` tags here; a tag made by hand is
+refused. Most releases need nothing: the Ashigaru sweep opens the release pull
+request and tags it when it merges. To cut one yourself:
+
+1. On a branch `chore/release-X.Y.Z`, move the Containerfile's two version
+   labels to X.Y.Z and roll CHANGELOG.md's Unreleased section into `[X.Y.Z]`.
+   Touch nothing else. Push it.
+2. Run the Release workflow from main with version `X.Y.Z`. The app opens the
+   pull request from `ashigaru/release-X.Y.Z`.
+3. Merge it. `release.yml` tags the merge commit as the app. The tag marks the
+   version; it builds nothing, since the image tracks `main`.
+
 ## License
 
 AGPL-3.0-or-later
