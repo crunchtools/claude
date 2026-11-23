@@ -21,10 +21,10 @@ All notable changes to this project are documented here. The format follows
   gateway route is unchanged.
 - A fresh seat commits with no manual setup (a1124). With no `JOSUI_GIT_NAME`
   or `JOSUI_GIT_EMAIL`, a named seat's git identity is the fleet's
-  `Claude ($JOSUI_NAME) <noreply@anthropic.com>`, and `/etc/gitconfig` sets
-  `init.templateDir` to a pre-commit template, so every new clone carries its
-  pre-commit, pre-merge-commit and pre-push hooks and `sdlc commit`'s
-  hooks-installed gate passes first time.
+  `Claude ($JOSUI_NAME) <noreply@anthropic.com>`, and `/etc/gitconfig` gives
+  any clone of a crunchtools repo pre-commit's pre-commit, pre-merge-commit
+  and pre-push hooks through `core.hooksPath`, so `sdlc commit`'s
+  hooks-installed gate passes first time. Other clones get no hooks.
 
 ### Fixed
 

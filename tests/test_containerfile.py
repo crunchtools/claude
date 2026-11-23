@@ -59,9 +59,13 @@ class ImageCopyTmpDirTest(unittest.TestCase):
 
 
 class GitTemplateTest(unittest.TestCase):
-    # Every clone gets pre-commit's hooks without `pre-commit install` (a1124).
-    def test_clones_get_pre_commit_hooks_from_a_system_template(self) -> None:
+    # A crunchtools clone gets pre-commit's hooks without `pre-commit install`,
+    # and no other clone does (a1124).
+    def test_only_crunchtools_clones_get_pre_commit_hooks(self) -> None:
         text = (ROOT / "Containerfile").read_text()
-        self.assertIn("git config --system init.templateDir /usr/share/developer/git-template", text)
+        self.assertNotIn("init.templateDir", text)
+        self.assertIn("'includeIf.hasconfig:remote.*.url:https://github.com/crunchtools/**.path'", text)
+        include = (ROOT / "rootfs/usr/share/developer/crunchtools-hooks.gitconfig").read_text()
+        self.assertRegex(include, r"(?m)^\thooksPath = /usr/share/developer/git-template/hooks$")
         hooks = "pre-commit init-templatedir -t pre-commit -t pre-merge-commit -t pre-push"
         self.assertRegex(text, re.escape(hooks) + r" \\\s+/usr/share/developer/git-template")

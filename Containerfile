@@ -160,13 +160,16 @@ RUN chmod 0755 /usr/local/bin/developer-entrypoint /usr/local/bin/developer-work
         /usr/libexec/developer/seat-state /usr/libexec/developer/ashigaru-hook && \
     bash -n /usr/local/bin/developer-entrypoint
 
-# Every clone and `git init` gets pre-commit's hooks from a system template, so
-# `sdlc commit`'s hooks-installed gate passes on a fresh clone with nobody
-# running `pre-commit install` first (a1124). The hooks skip a repo with no
-# .pre-commit-config.yaml. The hook environments still install on first run.
-# System config, not global: ~/.gitconfig is on the HOME volume, which an
-# image cannot reach.
-RUN git config --system init.templateDir /usr/share/developer/git-template && \
+# A clone of a crunchtools repo runs pre-commit's hooks with nobody running
+# `pre-commit install` first, so `sdlc commit`'s hooks-installed gate passes on
+# a fresh clone and on one made before this image (a1124). Only crunchtools
+# remotes: core.hooksPath comes from an includeIf on the remote URL, because a
+# hook in every clone would run any repo's own hook entries on commit. The
+# hook environments still install on first run. System config, not global:
+# ~/.gitconfig is on the HOME volume, which an image cannot reach.
+RUN git config --system \
+        'includeIf.hasconfig:remote.*.url:https://github.com/crunchtools/**.path' \
+        /usr/share/developer/crunchtools-hooks.gitconfig && \
     pre-commit init-templatedir -t pre-commit -t pre-merge-commit -t pre-push \
         /usr/share/developer/git-template && \
     test -x /usr/share/developer/git-template/hooks/pre-push
