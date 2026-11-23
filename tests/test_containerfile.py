@@ -76,8 +76,14 @@ class GitTemplateTest(unittest.TestCase):
     def test_git_sets_the_hooks_path_only_for_a_crunchtools_remote(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             system = Path(tmp) / "gitconfig"
-            include = ROOT / "rootfs/usr/share/developer/crunchtools-hooks.gitconfig"
-            condition = "hasconfig:remote.*.url:https://github.com/crunchtools/**"
+            # The condition and the included file are the ones the image wires up.
+            wiring = re.search(
+                r"'includeIf\.(\S+)\.path' \\\s+/usr(/share/developer/\S+\.gitconfig)",
+                CONTAINERFILE.read_text(),
+            )
+            if wiring is None:
+                self.fail("the Containerfile does not wire the crunchtools hooks include")
+            condition, include = wiring[1], ROOT / "rootfs/usr" / wiring[2].lstrip("/")
             system.write_text(f'[includeIf "{condition}"]\n\tpath = {include}\n')
             env = {
                 "PATH": os.environ["PATH"],
