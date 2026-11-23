@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-11-23
+
 ### Added
 
 - `release.yml`, so a release cut by hand is tagged by the Ashigaru app, the
