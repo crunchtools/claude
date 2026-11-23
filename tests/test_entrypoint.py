@@ -587,6 +587,18 @@ class EntrypointTest(EntrypointCase):
         with self.assertRaises(subprocess.CalledProcessError):
             self.git("--get", "user.name")
 
+    def test_a_named_seat_gets_the_fleet_identity(self) -> None:
+        env = {**self.env, "JOSUI_NAME": "Dolza 2 - Max"}
+        self.assertEqual(self.run_entrypoint(env=env).returncode, 0)
+        self.assertEqual(self.git("--get", "user.name"), "Claude (Dolza 2 - Max)")
+        self.assertEqual(self.git("--get", "user.email"), "noreply@anthropic.com")
+
+    def test_a_given_identity_beats_the_seat_name(self) -> None:
+        env = {**self.env, "JOSUI_NAME": "Dolza 2 - Max", "JOSUI_GIT_EMAIL": "seat@crunchtools.com"}
+        self.assertEqual(self.run_entrypoint(env=env).returncode, 0)
+        self.assertEqual(self.git("--get", "user.name"), "Claude (Dolza 2 - Max)")
+        self.assertEqual(self.git("--get", "user.email"), "seat@crunchtools.com")
+
     def test_mounted_env_files_are_installed_private(self) -> None:
         src = self.config / "mcp-env"
         src.mkdir()

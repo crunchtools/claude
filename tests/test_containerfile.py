@@ -56,3 +56,12 @@ class ImageCopyTmpDirTest(unittest.TestCase):
     def test_buildah_stages_under_the_storage_volume(self) -> None:
         conf = ROOT / "rootfs/etc/containers/containers.conf.d/50-image-copy-tmp-dir.conf"
         self.assertRegex(conf.read_text(), r'(?ms)^\[engine\]$.*^image_copy_tmp_dir = "storage"$')
+
+
+class GitTemplateTest(unittest.TestCase):
+    # Every clone gets pre-commit's hooks without `pre-commit install` (a1124).
+    def test_clones_get_pre_commit_hooks_from_a_system_template(self) -> None:
+        text = (ROOT / "Containerfile").read_text()
+        self.assertIn("git config --system init.templateDir /usr/share/developer/git-template", text)
+        hooks = "pre-commit init-templatedir -t pre-commit -t pre-merge-commit -t pre-push"
+        self.assertRegex(text, re.escape(hooks) + r" \\\s+/usr/share/developer/git-template")
