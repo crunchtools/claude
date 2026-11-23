@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -69,3 +72,35 @@ class GitTemplateTest(unittest.TestCase):
         self.assertRegex(include, r"(?m)^\thooksPath = /usr/share/developer/git-template/hooks$")
         hooks = "pre-commit init-templatedir -t pre-commit -t pre-merge-commit -t pre-push"
         self.assertRegex(text, re.escape(hooks) + r" \\\s+/usr/share/developer/git-template")
+
+    def test_git_sets_the_hooks_path_only_for_a_crunchtools_remote(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            system = Path(tmp) / "gitconfig"
+            include = ROOT / "rootfs/usr/share/developer/crunchtools-hooks.gitconfig"
+            condition = "hasconfig:remote.*.url:https://github.com/crunchtools/**"
+            system.write_text(f'[includeIf "{condition}"]\n\tpath = {include}\n')
+            env = {
+                "PATH": os.environ["PATH"],
+                "GIT_CONFIG_SYSTEM": str(system),
+                "GIT_CONFIG_GLOBAL": os.devnull,
+            }
+
+            def hooks_path(remote: str) -> str:
+                repo = Path(tmp) / remote.replace("/", "_")
+                subprocess.run(["git", "init", "-q", str(repo)], env=env, check=True)
+                subprocess.run(
+                    ["git", "-C", str(repo), "remote", "add", "origin", remote], env=env, check=True
+                )
+                result = subprocess.run(
+                    ["git", "-C", str(repo), "config", "core.hooksPath"],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                return result.stdout.strip()
+
+            self.assertEqual(
+                hooks_path("https://github.com/crunchtools/developer"),
+                "/usr/share/developer/git-template/hooks",
+            )
+            self.assertEqual(hooks_path("https://github.com/someone/else"), "")
