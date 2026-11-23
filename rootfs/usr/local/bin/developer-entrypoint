@@ -320,9 +320,15 @@ start_tmux_session() {
 #
 # A git identity, because a seat starts with none and several gates commit or
 # diff. Only when nothing is configured already: a person who sets their own
-# in the state volume keeps it.
+# in the state volume keeps it. JOSUI_GIT_NAME and JOSUI_GIT_EMAIL win; without
+# them a named seat takes the fleet's form, `Claude (Dolza 2 - Max)
+# <noreply@anthropic.com>`, so a fresh seat commits with no unit change (a1124).
 set_git_identity() {
   local name=${JOSUI_GIT_NAME:-} email=${JOSUI_GIT_EMAIL:-}
+  if [ -n "${JOSUI_NAME:-}" ]; then
+    name=${name:-"Claude ($JOSUI_NAME)"}
+    email=${email:-noreply@anthropic.com}
+  fi
   [ -n "$name" ] || [ -n "$email" ] || return 0
   if [ -n "$name" ] && ! git config --global --get user.name > /dev/null 2>&1; then
     git config --global user.name "$name"

@@ -19,6 +19,13 @@ All notable changes to this project are documented here. The format follows
   file as `OPENROUTER_API_KEY_FILE` and never holds the key; it needs
   crunchtools/sdlc 0.12.0 to mount the file into the gate. With no key file the
   gateway route is unchanged.
+- A fresh seat commits with no manual setup (a1124). With no `JOSUI_GIT_NAME`
+  or `JOSUI_GIT_EMAIL`, a named seat's git identity is the fleet's
+  `Claude ($JOSUI_NAME) <noreply@anthropic.com>`, and `/etc/gitconfig` gives
+  any clone whose remote is `https://github.com/crunchtools/...` pre-commit's
+  pre-commit, pre-merge-commit and pre-push hooks through `core.hooksPath`, so
+  `sdlc commit`'s hooks-installed gate passes first time. Other clones get no
+  hooks.
 
 ### Fixed
 

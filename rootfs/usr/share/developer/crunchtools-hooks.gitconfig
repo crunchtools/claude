@@ -1,0 +1,4 @@
+# Included from /etc/gitconfig only for a clone whose remote is a crunchtools
+# repository on GitHub, so pre-commit runs that repo's hooks and no other's.
+[core]
+	hooksPath = /usr/share/developer/git-template/hooks
