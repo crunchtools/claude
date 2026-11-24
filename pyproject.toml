@@ -45,3 +45,10 @@ skip = ["semgrep"]
 
 [tool.sdlc]
 repo-kinds = ["autonomous-agent"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/developer"
+boot = "command"
+boot-timeout = 600
+boot-command = "labels() { podman image inspect --format \"{{index .Config.Labels \\\"$1\\\"}}\" \"$IMAGE\"; }\ntest \"$(labels org.opencontainers.image.version)\" = \"$(labels version)\"\npodman run --rm --entrypoint /bin/bash \\\n  --device /dev/fuse --security-opt label=disable \\\n  \"$IMAGE\" -c '\n  set -euxo pipefail\n  claude --version\n  claude-agent --version\n  python3 -c \"import sys; assert sys.version_info[:2] >= (3, 14), sys.version\"\n  uv --version\n  tmux -V\n  git --version\n  node --version\n  pre-commit --version\n  podman --version\n  bash -n /usr/local/bin/developer-entrypoint\n  bash -n /usr/local/bin/developer-worker-claude\n  test -x /usr/local/bin/developer-worker-claude\n  test -x /usr/libexec/developer/seat-state\n  test -x /usr/libexec/developer/ashigaru-hook\n  ashigaru --help > /dev/null\n  test \"$(rpm -q --qf \"%{VERSION}\" ashigaru)\" = 5.3.0\n  test \"$(python3 -c \"import ashigaru; print(ashigaru.__version__)\")\" = 5.3.0\n  test -f /etc/claude-code/.claude/skills/ashigaru/SKILL.md\n  grep -q \"^name: ashigaru$\" /etc/claude-code/.claude/skills/ashigaru/SKILL.md\n  test \"$ASHIGARU_URL\" = https://ashigaru.crunchtools.com\n  echo \"{}\" | /usr/libexec/developer/ashigaru-hook stop\n  python3 -m json.tool /etc/claude-code/managed-settings.d/40-developer-seat.json > /dev/null\n'\n"
