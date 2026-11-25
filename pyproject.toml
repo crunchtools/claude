@@ -45,3 +45,27 @@ skip = ["semgrep"]
 
 [tool.sdlc]
 repo-kinds = ["autonomous-agent"]
+
+[tool.sdlc.ci]
+checks = ["developer-image", "boot-gate"]
+
+# Builds ./Containerfile at localhost/developer:sdlc for the boot gate below.
+[tool.sdlc.ci.developer-image]
+kind = "image-build"
+
+# The image's own assertions, run inside it with the entrypoint set to bash. The
+# two version labels are compared by tests/test_containerfile.py instead: labels
+# are not visible from inside the image. No --device /dev/fuse or label=disable
+# here; the script needs neither.
+[tool.sdlc.ci.boot-gate]
+kind = "command"
+image = "localhost/developer:sdlc"
+argv = ["bash", "tests/image/boot-check.sh"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/developer"
+# A seat needs a Claude login and the Desk's key, so the publish job has nothing
+# to start it with. The ci checks above (developer-image, boot-gate) are the gate.
+boot = "none"
+boot-none-reason = "a seat needs a login and the Desk's key; developer-image and boot-gate in [tool.sdlc.ci] run the image's assertions"
