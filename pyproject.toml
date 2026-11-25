@@ -46,9 +46,26 @@ skip = ["semgrep"]
 [tool.sdlc]
 repo-kinds = ["autonomous-agent"]
 
+[tool.sdlc.ci]
+checks = ["developer-image", "boot-gate"]
+
+# Builds ./Containerfile at localhost/developer:sdlc for the boot gate below.
+[tool.sdlc.ci.developer-image]
+kind = "image-build"
+
+# The image's own assertions, run inside it with the entrypoint set to bash. The
+# two version labels are compared by tests/test_containerfile.py instead: labels
+# are not visible from inside the image. No --device /dev/fuse or label=disable
+# here; the script needs neither.
+[tool.sdlc.ci.boot-gate]
+kind = "command"
+image = "localhost/developer:sdlc"
+argv = ["bash", "tests/image/boot-check.sh"]
+
 [tool.sdlc.image]
 # Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
 image = "quay.io/crunchtools/developer"
-boot = "command"
-boot-timeout = 600
-boot-command = "labels() { podman image inspect --format \"{{index .Config.Labels \\\"$1\\\"}}\" \"$IMAGE\"; }\ntest \"$(labels org.opencontainers.image.version)\" = \"$(labels version)\"\npodman run --rm --entrypoint /bin/bash \\\n  --device /dev/fuse --security-opt label=disable \\\n  \"$IMAGE\" -c '\n  set -euxo pipefail\n  claude --version\n  claude-agent --version\n  python3 -c \"import sys; assert sys.version_info[:2] >= (3, 14), sys.version\"\n  uv --version\n  tmux -V\n  git --version\n  node --version\n  pre-commit --version\n  podman --version\n  bash -n /usr/local/bin/developer-entrypoint\n  bash -n /usr/local/bin/developer-worker-claude\n  test -x /usr/local/bin/developer-worker-claude\n  test -x /usr/libexec/developer/seat-state\n  test -x /usr/libexec/developer/ashigaru-hook\n  ashigaru --help > /dev/null\n  test \"$(rpm -q --qf \"%{VERSION}\" ashigaru)\" = 5.3.0\n  test \"$(python3 -c \"import ashigaru; print(ashigaru.__version__)\")\" = 5.3.0\n  test -f /etc/claude-code/.claude/skills/ashigaru/SKILL.md\n  grep -q \"^name: ashigaru$\" /etc/claude-code/.claude/skills/ashigaru/SKILL.md\n  test \"$ASHIGARU_URL\" = https://ashigaru.crunchtools.com\n  echo \"{}\" | /usr/libexec/developer/ashigaru-hook stop\n  python3 -m json.tool /etc/claude-code/managed-settings.d/40-developer-seat.json > /dev/null\n'\n"
+# A seat needs a Claude login and the Desk's key, so the publish job has nothing
+# to start it with. The ci checks above (developer-image, boot-gate) are the gate.
+boot = "none"
+boot-none-reason = "a seat needs a login and the Desk's key; developer-image and boot-gate in [tool.sdlc.ci] run the image's assertions"
