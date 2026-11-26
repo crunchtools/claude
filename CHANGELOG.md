@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The parent is `quay.io/crunchtools/podman-stable:v5.8.9-immutable`, the
+  same digest as `quay.io/podman/stable`'s, mirrored and signed with the fleet
+  key by crunchtools/sdlc `scripts/mirror-parent.sh` (a1730). The fleet image
+  job refuses an unsigned parent, so the image could not be released since the
+  `ci.yml` cutover. The image's content is unchanged.
+
+### Changed
+
 - Ashigaru CLI 5.3.0 -> 6.0.2 (a1730). A seat whose SessionStart hook timed
   out rejoins through its `next` hook instead of going dark, and a seat keeps
   its key's seat name on tmpfs so `session-start` makes one round trip. Pairs
