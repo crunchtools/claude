@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Ashigaru CLI 5.3.0 -> 6.0.2 (a1730). A seat whose SessionStart hook timed
+  out rejoins through its `next` hook instead of going dark, and a seat keeps
+  its key's seat name on tmpfs so `session-start` makes one round trip. Pairs
+  with the 6.0.2 Desk (schema 14), which must be deployed first.
+
 ## [1.23.0] - 2026-11-23
 
 ### Added

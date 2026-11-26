@@ -73,10 +73,10 @@ ARG CLAUDE_AGENT_VERSION=1.2.0
 # fedora:43 and centos:stream10; the fc43 build is noarch against Python 3.14,
 # which is this base's too. A bump is these two lines -- the version and the
 # sha256 of that release's fc43 RPM -- plus the two version pins in the boot
-# gate (.github/workflows/container.yml), which check the image independently.
+# gate (tests/image/boot-check.sh), which check the image independently.
 # Only one RPM is installed (noarch, one dist), so one hash covers it.
-ARG ASHIGARU_VERSION=5.3.0
-ARG ASHIGARU_SHA256=11a044a796713602ddbc9918ed78e92f8ffb3d81c16eb30d5fdb690b3246bd02
+ARG ASHIGARU_VERSION=6.0.2
+ARG ASHIGARU_SHA256=3c324111fbf912c29b50a8930f53a6ad84130faa0627f09c272671f673563c47
 
 USER 0
 
