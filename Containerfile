@@ -53,9 +53,12 @@
 # dispatches rather than builds, so it never runs a nested engine, and it keeps
 # its SELinux label. The flags belong to the unit, not to the image.
 #
-# Build happens in GitHub Actions (.github/workflows/container.yml).
+# The parent is quay.io/podman/stable, mirrored at the same digest into
+# quay.io/crunchtools/podman-stable and signed with the fleet key
+# (crunchtools/sdlc scripts/mirror-parent.sh): the image job trusts no
+# unsigned parent.
 
-FROM quay.io/podman/stable@sha256:0ccbc4e7f79f9c33e7fc959be59f714abbc0f4c9cffbe14f5bceff537a014738
+FROM quay.io/crunchtools/podman-stable:v5.8.9-immutable@sha256:0ccbc4e7f79f9c33e7fc959be59f714abbc0f4c9cffbe14f5bceff537a014738
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
 LABEL version="1.23.0"
