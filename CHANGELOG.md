@@ -8,13 +8,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The parent is podman 6.2.0 on Fedora 45,
+  `quay.io/crunchtools/podman-stable:v6.2.0-immutable`, the fleet-signed mirror
+  of upstream's amd64 image (a1730). podman 5.8.9's binary carried
+  grpc-go 1.72.2, golang.org/x/net 0.57.0 and podman's own fixable Criticals,
+  and no Fedora 44 podman build moves grpc (5.8.11 in updates-testing still
+  carries 1.72.2); 6.2.0 has grpc 1.84.0. Python is 3.15, so the Ashigaru CLI
+  is the release's fc45 RPM. Fedora 45 also clears python3-anyio's Critical
+  (4.16.0).
+- `.grype.yaml` accepts GHSA-6q48-6c7w-9gw2 in certifi 2026.1.4 only, until
+  2026-12-26: Fedora's python3-certifi ships no CA bundle (`certifi.where()` is
+  the system trust store), so the emSign roots the advisory is about are not
+  in it, and no Fedora build is newer.
 - The parent is `quay.io/crunchtools/podman-stable:v5.8.9-immutable`, the
   same digest as `quay.io/podman/stable`'s, mirrored and signed with the fleet
   key by crunchtools/sdlc `scripts/mirror-parent.sh` (a1730). The fleet image
   job refuses an unsigned parent, so the image could not be released since the
   `ci.yml` cutover. The image's content is unchanged.
-
-### Changed
 
 - Ashigaru CLI 5.3.0 -> 6.0.2 (a1730). A seat whose SessionStart hook timed
   out rejoins through its `next` hook instead of going dark, and a seat keeps

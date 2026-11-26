@@ -1,0 +1,12 @@
+# Vulnerabilities container-scan accepts, each pinned to the one package version
+# it was judged on, so an update stops matching on its own (a1730).
+ignore:
+  # python3-certifi-2026.01.04-3.fc45. Fedora's certifi ships no CA bundle: certifi.where()
+  # returns the system trust store, /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem, so the
+  # emSign roots this advisory removes from certifi's own cacert.pem are not here; the trust
+  # store is ca-certificates', which `dnf -y upgrade` moves. No newer fc45 build as of
+  # 2026-11-26; remove when one ships; expires 2026-12-26
+  - vulnerability: GHSA-6q48-6c7w-9gw2
+    package:
+      name: certifi
+      version: 2026.1.4

@@ -58,7 +58,7 @@
 # (crunchtools/sdlc scripts/mirror-parent.sh): the image job trusts no
 # unsigned parent.
 
-FROM quay.io/crunchtools/podman-stable:v5.8.9-immutable@sha256:0ccbc4e7f79f9c33e7fc959be59f714abbc0f4c9cffbe14f5bceff537a014738
+FROM quay.io/crunchtools/podman-stable:v6.2.0-immutable@sha256:39a21e7832dbf018803aae152b421fc589563678e2559d36125a9cc4aba2617a
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
 LABEL version="1.23.0"
@@ -73,13 +73,13 @@ ARG CLAUDE_CODE_VERSION=2.1.304
 ARG CLAUDE_AGENT_VERSION=1.2.0
 # The Ashigaru CLI, whose `ashigaru hook` reports this seat to the Desk. 3.x
 # is a Python package shipped as an RPM on each GitHub release, built on
-# fedora:43 and centos:stream10; the fc43 build is noarch against Python 3.14,
+# fedora:43, fedora:45 and centos:stream10; the fc45 build is noarch against Python 3.15,
 # which is this base's too. A bump is these two lines -- the version and the
-# sha256 of that release's fc43 RPM -- plus the two version pins in the boot
+# sha256 of that release's fc45 RPM -- plus the two version pins in the boot
 # gate (tests/image/boot-check.sh), which check the image independently.
 # Only one RPM is installed (noarch, one dist), so one hash covers it.
 ARG ASHIGARU_VERSION=6.0.2
-ARG ASHIGARU_SHA256=3c324111fbf912c29b50a8930f53a6ad84130faa0627f09c272671f673563c47
+ARG ASHIGARU_SHA256=ac97ef5ada61dea1976b52cd68fdcdebbc932fa607d2cfbe85d1176e19ea88c0
 
 USER 0
 
@@ -97,8 +97,8 @@ RUN rpm --import https://downloads.claude.ai/keys/claude-code.asc && \
     curl -fsSL -o /etc/yum.repos.d/crunchtools.repo \
         https://crunchtools.github.io/packages/rpm/crunchtools.repo
 
-# Fedora 44's python3 IS 3.14, which is what Trentina's requires-python asks
-# for, so nothing here fetches a Python runtime at run time. uv and pre-commit
+# Fedora 45's python3 is 3.15, which meets Trentina's requires-python (3.14+),
+# so nothing here fetches a Python runtime at run time. uv and pre-commit
 # come from the distribution for the same reason: a dev container's network is
 # an allowlist, and every tool it has to download is another host on it.
 #
@@ -136,7 +136,7 @@ RUN dnf -y upgrade && \
 # Code's managed skills folder, /etc/claude-code/.claude/skills, which every
 # session loads beside the josui-skills links in ~/.claude/skills. A link, not
 # a copy, so a version bump brings its own skill with it.
-RUN rpm=/tmp/ashigaru-${ASHIGARU_VERSION}-1.fc43.noarch.rpm && \
+RUN rpm=/tmp/ashigaru-${ASHIGARU_VERSION}-1.fc45.noarch.rpm && \
     curl -fsSL -o "$rpm" \
         "https://github.com/crunchtools/ashigaru/releases/download/v${ASHIGARU_VERSION}/${rpm##*/}" && \
     echo "${ASHIGARU_SHA256}  $rpm" | sha256sum -c --strict - && \
