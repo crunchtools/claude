@@ -20,8 +20,8 @@ test -x /usr/local/bin/developer-worker-claude
 test -x /usr/libexec/developer/seat-state
 test -x /usr/libexec/developer/ashigaru-hook
 ashigaru --help > /dev/null
-test "$(rpm -q --qf '%{VERSION}' ashigaru)" = 5.3.0
-test "$(python3 -c 'import ashigaru; print(ashigaru.__version__)')" = 5.3.0
+test "$(rpm -q --qf '%{VERSION}' ashigaru)" = 6.0.2
+test "$(python3 -c 'import ashigaru; print(ashigaru.__version__)')" = 6.0.2
 test -f /etc/claude-code/.claude/skills/ashigaru/SKILL.md
 grep -q '^name: ashigaru$' /etc/claude-code/.claude/skills/ashigaru/SKILL.md
 test "$ASHIGARU_URL" = https://ashigaru.crunchtools.com
