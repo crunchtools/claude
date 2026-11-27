@@ -49,7 +49,7 @@ repo-kinds = ["autonomous-agent"]
 [tool.sdlc.ci]
 checks = ["developer-image", "boot-gate"]
 
-# Builds ./Containerfile at localhost/developer:sdlc for the boot gate below.
+# Builds ./Containerfile at localhost/claude:sdlc ([project] name) for the boot gate below.
 [tool.sdlc.ci.developer-image]
 kind = "image-build"
 
@@ -59,12 +59,12 @@ kind = "image-build"
 # here; the script needs neither.
 [tool.sdlc.ci.boot-gate]
 kind = "command"
-image = "localhost/developer:sdlc"
+image = "localhost/claude:sdlc"
 argv = ["bash", "tests/image/boot-check.sh"]
 
 [tool.sdlc.image]
-# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
-image = "quay.io/crunchtools/developer"
+# The repo's own name, which sdlc requires; it was developer until #41.
+image = "quay.io/crunchtools/claude"
 # A seat needs a Claude login and the Desk's key, so the publish job has nothing
 # to start it with. The ci checks above (developer-image, boot-gate) are the gate.
 boot = "none"
