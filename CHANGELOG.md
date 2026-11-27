@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `[tool.sdlc.image]` names `quay.io/crunchtools/claude`, the repo's own image,
+  so sdlc/check passes again (a1879). It still named `developer`, which sdlc
+  refuses since the repository was renamed.
+
 ## [1.24.0] - 2026-11-27
 
 ### Changed
