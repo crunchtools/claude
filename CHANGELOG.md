@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- claude-agent 1.2.0 -> claude-supervisor 2.0.0 (crunchtools/claude-supervisor#35),
+  installed from its GitHub release and pinned by hash. The settings are
+  `CLAUDE_SUPERVISOR` and `CLAUDE_SUPERVISOR_*`, and the entrypoint runs
+  `claude-supervisor run`; `claude-agent` and `CLAUDE_AGENT_*` still resolve
+  through 2.x. The tmux socket and session keep the `claude-agent` name.
+- Renamed for the software rather than one role (#41): the repository is
+  `crunchtools/claude` and the image `quay.io/crunchtools/claude`. In the
+  image, `developer-entrypoint` is `claude-entrypoint`,
+  `developer-worker-claude` is `claude-worker`, `developer-skills-sync` is
+  `claude-skills-sync`, `/usr/libexec/developer` is `/usr/libexec/claude-seat`
+  and the seat hooks are `40-claude-seat.json`.
 - The parent is podman 6.2.0 on Fedora 45,
   `quay.io/crunchtools/podman-stable:v6.2.0-immutable`, the fleet-signed mirror
   of upstream's amd64 image (a1730). podman 5.8.9's binary carried
@@ -30,6 +41,13 @@ All notable changes to this project are documented here. The format follows
   out rejoins through its `next` hook instead of going dark, and a seat keeps
   its key's seat name on tmpfs so `session-start` makes one round trip. Pairs
   with the 6.0.2 Desk (schema 14), which must be deployed first.
+
+### Deprecated
+- For one release the old command and hook paths are links to the new ones.
+  `40-developer-seat.json` is not kept, since two copies would run every seat
+  hook twice. `quay.io/crunchtools/developer` is not published again: every
+  unit on Dolza, Exedore and breetai is repointed to `quay.io/crunchtools/claude`
+  in the same change, so nothing auto-updates onto the old name.
 
 ## [1.23.0] - 2026-11-23
 

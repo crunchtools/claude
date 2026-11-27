@@ -1,7 +1,7 @@
 #!/bin/bash
 # Assemble Josui's Claude Code home from what was mounted, then serve Remote
 # Control. Anything given as arguments runs instead, with the same home:
-#   podman run -it ... quay.io/crunchtools/developer claude auth login
+#   podman run -it ... quay.io/crunchtools/claude claude auth login
 set -euo pipefail
 
 config_dir=${JOSUI_CONFIG_DIR:?JOSUI_CONFIG_DIR is not set}
@@ -42,11 +42,11 @@ if [ -n "${TRENTINA_MCP_TOKEN_FILE:-}" ]; then
   unset token_from_file TRENTINA_MCP_TOKEN_FILE
 fi
 
-# josui.env keeps the names it has always had; claude-agent reads its own.
+# josui.env keeps the names it has always had; claude-supervisor reads its own.
 for name in ANSWER_PERMISSIONS MAX_TOOL_CALLS MAX_REPEAT; do
   value="JOSUI_$name"
   if [ -n "${!value:-}" ]; then
-    export "CLAUDE_AGENT_$name=${!value}"
+    export "CLAUDE_SUPERVISOR_$name=${!value}"
   fi
 done
 
@@ -178,12 +178,12 @@ if [ -n "$git_url" ] && [ -n "${TRENTINA_MCP_TOKEN:-}" ]; then
   git config --global --get-all include.path | grep -qxF "$gitconf" ||
     git config --global --add include.path "$gitconf"
 fi
-# Skills are a git checkout on a volume, kept current by developer-skills-sync
+# Skills are a git checkout on a volume, kept current by claude-skills-sync
 # (#42): one pass now, then one every JOSUI_SKILLS_SYNC_INTERVAL seconds in
 # the background (sync_loop, below), so a josui-skills merge goes live without
 # a restart. A failed pass is not fatal: the checkout that is there still
 # works, and the network may be the thing down.
-skills_sync=("$(dirname "$(readlink -f "$0")")/developer-skills-sync" --link "$claude_dir" "$skills_repo")
+skills_sync=("$(dirname "$(readlink -f "$0")")/claude-skills-sync" --link "$claude_dir" "$skills_repo")
 "${skills_sync[@]}"
 
 # Claude Code's state file is JSON holding things only it knows about, so it
@@ -247,18 +247,18 @@ fi
 gateway_token=${TRENTINA_MCP_TOKEN:-}
 unset TRENTINA_MCP_TOKEN
 
-# The text session, when a homeserver is configured: claude-agent run holds an
+# The text session, when a homeserver is configured: claude-supervisor run holds an
 # interactive session and starts its Matrix bridge beside it. The bridge keeps
 # the sync position the old channel kept, so texts sent across the upgrade
 # arrive. The session is interactive, so onboarding is recorded as done; the
 # working directory's trust question is left to the operator (see README).
-# Audit files are pruned by claude-agent's audit hook itself.
+# Audit files are pruned by claude-supervisor's audit hook itself.
 session=
 if [ -n "${JOSUI_MATRIX_HOMESERVER:-}" ]; then
-  export CLAUDE_AGENT_MATRIX_HOMESERVER=$JOSUI_MATRIX_HOMESERVER
-  export CLAUDE_AGENT_MATRIX_TOKEN_FILE=${JOSUI_MATRIX_TOKEN_FILE:-/etc/josui-matrix/token}
-  export CLAUDE_AGENT_MATRIX_ALLOW=${JOSUI_MATRIX_ALLOW:-}
-  export CLAUDE_AGENT_MATRIX_STATE=$HOME/.config/josui/matrix-sync
+  export CLAUDE_SUPERVISOR_MATRIX_HOMESERVER=$JOSUI_MATRIX_HOMESERVER
+  export CLAUDE_SUPERVISOR_MATRIX_TOKEN_FILE=${JOSUI_MATRIX_TOKEN_FILE:-/etc/josui-matrix/token}
+  export CLAUDE_SUPERVISOR_MATRIX_ALLOW=${JOSUI_MATRIX_ALLOW:-}
+  export CLAUDE_SUPERVISOR_MATRIX_STATE=$HOME/.config/josui/matrix-sync
   edit_state_json onboarded
   session=1
 fi
@@ -288,7 +288,7 @@ fi
 #
 #   podman exec -it <service> tmux attach -t dev
 #
-# tmux rather than `claude-agent attach --rw`, which renders the supervised
+# tmux rather than `claude-supervisor attach --rw`, which renders the supervised
 # session at the fixed size the supervisor set rather than the attaching
 # terminal's. Deliberately NOT in the pid list below: someone exiting their
 # own shell must not take the container down with it.
@@ -366,7 +366,7 @@ install_mcp_env() {
 # (gatehouse/llm.py `_is_private`), and refuses a name on purpose: it cannot
 # know where a name resolves. The seat units name the gateway on the container
 # bridge (`http://trentina:8019/...`), so that URL made every gate "COULD NOT
-# RUN" (crunchtools/developer#89).
+# RUN" (crunchtools/claude#89).
 #
 # So the name is resolved here, once, at start, and replaced by its address --
 # but only when that address is one Gatehouse would accept anyway. A name that
@@ -566,14 +566,14 @@ install_gatehouse_env() {
   # that could not run.
   if [ -n "$direct" ]; then
     cat > "$tmp" <<ENVEOF
-# Written by developer-entrypoint at container start. Do not edit: it is
+# Written by claude-entrypoint at container start. Do not edit: it is
 # replaced on every start. See a968 in the README.
 GATEHOUSE_LLM_BASE_URL=$url
 OPENROUTER_API_KEY_FILE=$keyfile
 ENVEOF
   else
     cat > "$tmp" <<ENVEOF
-# Written by developer-entrypoint at container start. Do not edit: it is
+# Written by claude-entrypoint at container start. Do not edit: it is
 # replaced on every start. See RT#1559.
 GATEHOUSE_LLM_BASE_URL=$url
 OPENROUTER_API_KEY=$gateway_token
@@ -612,8 +612,8 @@ server_args=(
 # HTTP 400, and the only trace was in this file. It is truncated at each start
 # and capped by the watchdog above.
 debug_file=${JOSUI_DEBUG_FILE:-}
-if [ -z "$debug_file" ] && [ -n "${CLAUDE_AGENT_AUDIT_DIR:-}" ] && [ -d "${CLAUDE_AGENT_AUDIT_DIR:-}" ]; then
-  debug_file="$CLAUDE_AGENT_AUDIT_DIR/remote-control.log"
+if [ -z "$debug_file" ] && [ -n "${CLAUDE_SUPERVISOR_AUDIT_DIR:-}" ] && [ -d "${CLAUDE_SUPERVISOR_AUDIT_DIR:-}" ]; then
+  debug_file="$CLAUDE_SUPERVISOR_AUDIT_DIR/remote-control.log"
 fi
 if [ -n "$debug_file" ] && : > "$debug_file" 2>/dev/null; then
   # Emptied here, at each start, which is the only cap it has now that there is
@@ -633,11 +633,11 @@ server_args+=(--remote-control-session-name-prefix "${JOSUI_NAME:-josui}")
 # seconds later by the pane-died hook -- a worker Prime cannot message is no
 # worker -- and the delay keeps one that cannot start (not logged in) from
 # spinning. The container ends only when the tmux session does.
-# developer-worker-claude resumes the seat's pinned conversation, so a
+# claude-worker resumes the seat's pinned conversation, so a
 # restart keeps its one claude.ai entry instead of adding another.
 start_worker_session() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
-  local args=(developer-worker-claude -n "$name")
+  local args=(claude-worker -n "$name")
   if ! command -v "$tmux" > /dev/null 2>&1; then
     log "JOSUI_MODE=worker needs $tmux, which is not in this image"
     exit 1
@@ -656,19 +656,19 @@ start_worker_session() {
 }
 
 # A worker with a homeserver (Josui Prime, texted over RCS through Matrix) is
-# one conversation held by claude-agent: the supervisor owns the pty, the
+# one conversation held by claude-supervisor: the supervisor owns the pty, the
 # Matrix bridge delivers texts into it, Remote Control and voice
-# (`claude-agent send`) reach the same session. A second, separate text
+# (`claude-supervisor send`) reach the same session. A second, separate text
 # session would split Prime in two, which is what the server path does.
 #
 # claude-agent 1.1.0 holds Claude Code in tmux itself, on a server of its own
 # (`tmux -L claude-agent`), so a person reaches it with
-# `claude-agent attach --rw`, sized to their terminal. There is no `dev`
+# `claude-supervisor attach --rw`, sized to their terminal. There is no `dev`
 # session here: run inside one, that attach would nest tmux. The supervisor
 # is the supervised pid: when Claude Code exits the container ends and the
-# unit restarts it. CLAUDE_AGENT_CLAUDE makes the supervisor run
-# developer-worker-claude, so this conversation is resumed too -- at every
-# start, CLAUDE_AGENT_RESPAWN's included, not once here.
+# unit restarts it. CLAUDE_SUPERVISOR_CLAUDE makes the supervisor run
+# claude-worker, so this conversation is resumed too -- at every
+# start, CLAUDE_SUPERVISOR_RESPAWN's included, not once here.
 start_supervised_worker() {
   local tmux=${JOSUI_TMUX_CMD:-tmux} name=${JOSUI_NAME:-josui}
   local args=(-n "$name")
@@ -681,9 +681,9 @@ start_supervised_worker() {
     args+=(--remote-control "$name")
   fi
   args+=(--permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}")
-  CLAUDE_AGENT_CLAUDE=developer-worker-claude claude-agent run -- "${args[@]}" &
+  CLAUDE_SUPERVISOR_CLAUDE=claude-worker claude-supervisor run -- "${args[@]}" &
   pids+=($!)
-  log "worker '$name' is up under claude-agent with texting: podman exec -it <service> claude-agent attach --rw"
+  log "worker '$name' is up under claude-supervisor with texting: podman exec -it <service> claude-supervisor attach --rw"
 }
 
 # The periodic skills pass. Not a supervised pid: a sync that dies must not
@@ -714,7 +714,7 @@ elif [ "$skills_interval" != 0 ]; then
 fi
 
 # The Remote Control server (or, for a worker, the tmux session holding its
-# one conversation) and -- when a homeserver is configured -- claude-agent,
+# one conversation) and -- when a homeserver is configured -- claude-supervisor,
 # side by side. When either ends the container ends, and the unit restarts
 # both.
 pids=()
@@ -733,7 +733,7 @@ else
   pids+=($!)
 fi
 if [ -n "$session" ] && [ -z "$supervised" ]; then
-  claude-agent run -- --permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}" &
+  claude-supervisor run -- --permission-mode "${JOSUI_PERMISSION_MODE:-acceptEdits}" &
   pids+=($!)
 fi
 if [ -n "${JOSUI_TMUX:-}" ] && [ "${JOSUI_MODE:-server}" != worker ]; then
