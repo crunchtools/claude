@@ -10,7 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - `[tool.sdlc.image]` names `quay.io/crunchtools/claude`, the repo's own image,
   so sdlc/check passes again (a1879). It still named `developer`, which sdlc
-  refuses since the repository was renamed.
+  refuses since the repository was renamed. The boot gate runs
+  `localhost/claude:sdlc`, the tag the image build now gives it.
 
 ## [1.24.0] - 2026-11-27
 

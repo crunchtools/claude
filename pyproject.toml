@@ -49,7 +49,7 @@ repo-kinds = ["autonomous-agent"]
 [tool.sdlc.ci]
 checks = ["developer-image", "boot-gate"]
 
-# Builds ./Containerfile at localhost/developer:sdlc for the boot gate below.
+# Builds ./Containerfile at localhost/claude:sdlc ([project] name) for the boot gate below.
 [tool.sdlc.ci.developer-image]
 kind = "image-build"
 
@@ -59,7 +59,7 @@ kind = "image-build"
 # here; the script needs neither.
 [tool.sdlc.ci.boot-gate]
 kind = "command"
-image = "localhost/developer:sdlc"
+image = "localhost/claude:sdlc"
 argv = ["bash", "tests/image/boot-check.sh"]
 
 [tool.sdlc.image]
