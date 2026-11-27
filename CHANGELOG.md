@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `[tool.sdlc.image]` names `quay.io/crunchtools/claude`, the repo's own image,
+  so sdlc/check passes again (a1879). It still named `developer`, which sdlc
+  refuses since the repository was renamed. The boot gate runs
+  `localhost/claude:sdlc`, the tag the image build now gives it.
+
 ## [1.24.0] - 2026-11-27
 
 ### Changed
@@ -45,7 +52,7 @@ All notable changes to this project are documented here. The format follows
   with the 6.0.2 Desk (schema 14), which must be deployed first.
 
 ### Deprecated
-- For one release the old command and hook paths are links to the new ones.
+- Until 1.25.0 removes them, the old command and hook paths are links to the new ones.
   `40-developer-seat.json` is not kept, since two copies would run every seat
   hook twice. `quay.io/crunchtools/developer` is not published again: every
   unit on Dolza, Exedore and breetai is repointed to `quay.io/crunchtools/claude`

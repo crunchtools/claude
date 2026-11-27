@@ -3,9 +3,9 @@
 The crunchtools build of Claude Code in a container, published as
 `quay.io/crunchtools/claude`. Josui Prime and the worker seats (Vertex 1-4 on
 dolza, Max 1-4 on exedore) all run it; the workers **build** the crunchtools
-fleet. Until #41's cutover is done the image is also published as
-`quay.io/crunchtools/developer`, and the old `developer-*` command names are
-links to the new `claude-*` ones.
+fleet. `quay.io/crunchtools/developer` is no longer published; it stays at its
+last build, and the old `developer-*` command names are links to the new
+`claude-*` ones until #41's cutover is done.
 
 It is not [josui](https://github.com/crunchtools/josui), and that is the point.
 `josui.crunchtools.com` is one agent that *operates* the fleet: the operator
