@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-11-27
+
 ### Changed
 
 - claude-agent 1.2.0 -> claude-supervisor 2.0.0 (crunchtools/claude-supervisor#35),
