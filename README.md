@@ -51,7 +51,7 @@ starting it without a gateway.
 The token is written to Claude Code's state file, git's include file and
 `gatehouse.env`, all 0600, and removed from the environment before Claude Code
 starts. It is the only secret the entrypoint reads; the Matrix token is already
-a file (`JOSUI_MATRIX_TOKEN_FILE`) that claude-agent reads itself.
+a file (`JOSUI_MATRIX_TOKEN_FILE`) that claude-supervisor reads itself.
 
 ## Attaching
 
@@ -61,7 +61,7 @@ podman exec -it developer1.crunchtools.com tmux attach -t dev   # JOSUI_TMUX=1
 
 Window 0 is Claude Code, window 1 a shell in the work directory. tmux follows
 the attaching terminal's size and survives the disconnect, which is why it is
-this and not `claude-agent attach`. The session is deliberately not watched:
+this and not `claude-supervisor attach`. The session is deliberately not watched:
 quitting your own shell must not end the container. Nothing listens for an
 inbound connection.
 
@@ -94,13 +94,13 @@ until the cutover retires seat-state.json. The Ashigaru RPM's `/ashigaru`
 skill is linked into Claude Code's managed skills folder,
 `/etc/claude-code/.claude/skills`, so every seat has it beside josui-skills.
 
-A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-agent run`
+A worker with `JOSUI_MATRIX_HOMESERVER` set is held by `claude-supervisor run`
 instead: one session that the Matrix bridge texts into, Remote Control reaches
-and `claude-agent send` prompts. claude-agent keeps it in tmux on a server of
+and `claude-supervisor send` prompts. claude-supervisor keeps it in tmux on a server of
 its own, and there is no `dev` session; attach with
 
 ```bash
-podman exec -it josui claude-agent attach --rw   # or, over ssh: claude-agent attach --rw
+podman exec -it josui claude-supervisor attach --rw   # or, over ssh: claude-supervisor attach --rw
 ```
 
 which follows your terminal's size; prefix d detaches. Leave off `--rw` to

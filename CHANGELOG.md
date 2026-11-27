@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- claude-agent 1.2.0 -> claude-supervisor 2.0.0 (crunchtools/claude-supervisor#35),
+  installed from its GitHub release and pinned by hash. The settings are
+  `CLAUDE_SUPERVISOR` and `CLAUDE_SUPERVISOR_*`, and the entrypoint runs
+  `claude-supervisor run`; `claude-agent` and `CLAUDE_AGENT_*` still resolve
+  through 2.x. The tmux socket and session keep the `claude-agent` name.
 - Renamed for the software rather than one role (#41): the repository is
   `crunchtools/claude` and the image `quay.io/crunchtools/claude`. In the
   image, `developer-entrypoint` is `claude-entrypoint`,
@@ -38,11 +43,11 @@ All notable changes to this project are documented here. The format follows
   with the 6.0.2 Desk (schema 14), which must be deployed first.
 
 ### Deprecated
-- For one release the old names stay: the image is also published as
-  `quay.io/crunchtools/developer` (a second gated build of each push to
-  `main`), and the old command and hook paths are links to the new ones.
+- For one release the old command and hook paths are links to the new ones.
   `40-developer-seat.json` is not kept, since two copies would run every seat
-  hook twice. Both go once Dolza's and Exedore's units name `claude`.
+  hook twice. `quay.io/crunchtools/developer` is not published again: every
+  unit on Dolza, Exedore and breetai is repointed to `quay.io/crunchtools/claude`
+  in the same change, so nothing auto-updates onto the old name.
 
 ## [1.23.0] - 2026-11-23
 

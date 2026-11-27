@@ -1,5 +1,5 @@
 #!/bin/bash
-# The program in a worker's pane (and, through CLAUDE_AGENT_CLAUDE, the
+# The program in a worker's pane (and, through CLAUDE_SUPERVISOR_CLAUDE, the
 # texted worker's): Claude Code with the arguments the entrypoint built, in
 # the seat's one conversation. A fresh conversation is a fresh claude.ai
 # Remote Control entry, and the stale ones pile up on every restart.
@@ -18,7 +18,7 @@
 # may be one someone ran by hand. Never `--resume <name>`: names repeat, and
 # the picker it opens hangs an unattended pane.
 #
-# Decided at every launch, so the pane-died hook and CLAUDE_AGENT_RESPAWN,
+# Decided at every launch, so the pane-died hook and CLAUDE_SUPERVISOR_RESPAWN,
 # which re-run this same command, resume too. The transcript is looked for
 # in Claude Code's project directory for the physical cwd: every character
 # outside [A-Za-z0-9] becomes '-'. A path longer than 200 of those is hashed

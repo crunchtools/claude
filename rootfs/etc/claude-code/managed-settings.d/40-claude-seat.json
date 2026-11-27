@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/libexec/developer/ashigaru-hook next",
+            "command": "/usr/libexec/claude-seat/ashigaru-hook next",
             "async": true,
             "asyncRewake": true,
             "timeout": 86400

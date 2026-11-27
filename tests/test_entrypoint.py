@@ -416,7 +416,7 @@ class EntrypointTest(EntrypointCase):
         self.assertEqual((self.home / "claude-args").read_text().split(), ["auth", "login"])
 
     def session_env(self) -> dict[str, str]:
-        agent = self.root / "bin/claude-agent"
+        agent = self.root / "bin/claude-supervisor"
         agent.write_text(
             '#!/bin/bash\nprintf "%s\\n" "$@" > "$HOME/agent-args"\nenv > "$HOME/agent-env"\nexit 7\n'
         )
@@ -440,7 +440,7 @@ class EntrypointTest(EntrypointCase):
 
     def test_text_session_runs_beside_remote_control_and_either_ending_stops_both(self) -> None:
         result = self.run_entrypoint(env=self.session_env())
-        # The stand-in claude-agent exits 7 at once; the server is stopped too.
+        # The stand-in claude-supervisor exits 7 at once; the server is stopped too.
         self.assertEqual(result.returncode, 7, result.stderr)
         self.assertIn("a supervised process ended (status 7)", result.stderr)
         self.assertEqual((self.home / "claude-args").read_text().split()[0], "remote-control")
@@ -452,11 +452,11 @@ class EntrypointTest(EntrypointCase):
     def test_the_bridge_gets_the_matrix_settings_under_its_own_names(self) -> None:
         self.run_entrypoint(env=self.session_env())
         env = self.agent_env()
-        self.assertEqual(env["CLAUDE_AGENT_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
-        self.assertEqual(env["CLAUDE_AGENT_MATRIX_TOKEN_FILE"], "/etc/josui-matrix/token")
-        self.assertEqual(env["CLAUDE_AGENT_MATRIX_ALLOW"], "@alice:example.org")
+        self.assertEqual(env["CLAUDE_SUPERVISOR_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
+        self.assertEqual(env["CLAUDE_SUPERVISOR_MATRIX_TOKEN_FILE"], "/etc/josui-matrix/token")
+        self.assertEqual(env["CLAUDE_SUPERVISOR_MATRIX_ALLOW"], "@alice:example.org")
         # The old channel's sync position, so texts sent across the upgrade arrive.
-        self.assertEqual(env["CLAUDE_AGENT_MATRIX_STATE"], str(self.home / ".config/josui/matrix-sync"))
+        self.assertEqual(env["CLAUDE_SUPERVISOR_MATRIX_STATE"], str(self.home / ".config/josui/matrix-sync"))
         self.assertNotIn("s3cret-token", (self.home / "agent-env").read_text())
 
     def test_josui_settings_reach_claude_agent(self) -> None:
@@ -470,9 +470,9 @@ class EntrypointTest(EntrypointCase):
         agent = self.agent_env()
         self.assertEqual(
             (
-                agent["CLAUDE_AGENT_ANSWER_PERMISSIONS"],
-                agent["CLAUDE_AGENT_MAX_TOOL_CALLS"],
-                agent["CLAUDE_AGENT_MAX_REPEAT"],
+                agent["CLAUDE_SUPERVISOR_ANSWER_PERMISSIONS"],
+                agent["CLAUDE_SUPERVISOR_MAX_TOOL_CALLS"],
+                agent["CLAUDE_SUPERVISOR_MAX_REPEAT"],
             ),
             ("1", "900", "7"),
         )
@@ -495,7 +495,7 @@ class EntrypointTest(EntrypointCase):
         audit.mkdir()
         stale = audit / "remote-control.log"
         stale.write_text("from the last container\n")
-        result = self.run_entrypoint(env={**self.env, "CLAUDE_AGENT_AUDIT_DIR": str(audit)})
+        result = self.run_entrypoint(env={**self.env, "CLAUDE_SUPERVISOR_AUDIT_DIR": str(audit)})
         self.assertEqual(result.returncode, 0, result.stderr)
         args = (self.home / "claude-args").read_text().split()
         self.assertEqual(args[args.index("--debug-file") + 1], str(stale))
@@ -1005,7 +1005,7 @@ class EntrypointTest(EntrypointCase):
         self.assertIn("no tmux-that-is-not-installed in this image", result.stderr)
 
     def test_without_a_homeserver_there_is_no_text_session(self) -> None:
-        agent = self.root / "bin/claude-agent"
+        agent = self.root / "bin/claude-supervisor"
         agent.write_text('#!/bin/bash\ntouch "$HOME/agent-ran"\n')
         agent.chmod(0o755)
         self.assertEqual(self.run_entrypoint().returncode, 0)
@@ -1300,12 +1300,12 @@ class EntrypointTest(EntrypointCase):
         data = json.loads((self.home / ".claude/settings.json").read_text())
         self.assertNotIn("skipDangerousModePermissionPrompt", data)
 
-    # A worker with a homeserver is ONE session, held by claude-agent.
+    # A worker with a homeserver is ONE session, held by claude-supervisor.
     def test_texted_worker_is_one_session_under_claude_agent(self) -> None:
         self.fake_tmux()
         env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_RC": "1", "JOSUI_NAME": "Josui Prime"}
         result = self.run_entrypoint(env=env)
-        # The stand-in claude-agent exits 7: the container ends with it.
+        # The stand-in claude-supervisor exits 7: the container ends with it.
         self.assertEqual(result.returncode, 7, result.stderr)
         self.assertEqual(
             (self.home / "agent-args").read_text().splitlines(),
@@ -1322,32 +1322,32 @@ class EntrypointTest(EntrypointCase):
         )
         # No Remote Control server and no second Claude Code.
         self.assertFalse((self.home / "claude-args").exists())
-        self.assertIn("under claude-agent with texting", result.stderr)
-        self.assertEqual(self.agent_env()["CLAUDE_AGENT_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
+        self.assertIn("under claude-supervisor with texting", result.stderr)
+        self.assertEqual(self.agent_env()["CLAUDE_SUPERVISOR_MATRIX_HOMESERVER"], "http://192.0.2.3:6167")
 
     # The supervisor runs claude-worker, so the texted worker
     # continues its conversation at every (re)spawn as a seat does.
     def test_texted_worker_continues_through_the_wrapper(self) -> None:
         self.fake_tmux()
         self.run_entrypoint(env={**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_NAME": "Josui Prime"})
-        self.assertEqual(self.agent_env()["CLAUDE_AGENT_CLAUDE"], "claude-worker")
+        self.assertEqual(self.agent_env()["CLAUDE_SUPERVISOR_CLAUDE"], "claude-worker")
 
     def test_text_session_beside_the_server_runs_plain_claude(self) -> None:
         self.run_entrypoint(env=self.session_env())
-        self.assertNotIn("CLAUDE_AGENT_CLAUDE", self.agent_env())
+        self.assertNotIn("CLAUDE_SUPERVISOR_CLAUDE", self.agent_env())
 
-    # claude-agent holds the session in tmux itself: a `dev` session running
+    # claude-supervisor holds the session in tmux itself: a `dev` session running
     # its attach would nest tmux, so there is none, and the log says how in.
     def test_texted_worker_starts_no_tmux_and_says_how_to_attach(self) -> None:
         self.fake_tmux()
         env = {**self.session_env(), "JOSUI_MODE": "worker", "JOSUI_NAME": "Josui Prime"}
         result = self.run_entrypoint(env=env)
         self.assertFalse((self.home / "tmux-args").exists())
-        self.assertIn("podman exec -it <service> claude-agent attach --rw", result.stderr)
+        self.assertIn("podman exec -it <service> claude-supervisor attach --rw", result.stderr)
         self.assertNotIn("tmux attach -t dev", result.stderr)
 
     def test_worker_without_a_homeserver_is_not_supervised(self) -> None:
-        agent = self.root / "bin/claude-agent"
+        agent = self.root / "bin/claude-supervisor"
         agent.write_text('#!/bin/bash\ntouch "$HOME/agent-ran"\n')
         agent.chmod(0o755)
         result, calls = self.worker_calls()

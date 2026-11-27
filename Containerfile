@@ -63,16 +63,23 @@
 FROM quay.io/crunchtools/podman-stable:v6.2.0-immutable@sha256:39a21e7832dbf018803aae152b421fc589563678e2559d36125a9cc4aba2617a
 
 LABEL maintainer="fatherlinux <scott.mccarty@crunchtools.com>"
-LABEL version="1.23.0"
+LABEL version="1.24.0"
 # The base sets this to its own release; the image reports ours.
 LABEL org.opencontainers.image.version="1.24.0"
 LABEL description="claude - the crunchtools build of Claude Code: a toolchain and nested podman for development agents"
 
 # The same versions the production image runs. A new Claude Code or
-# claude-agent is tested on Josui Prime before it reaches a dev container:
+# claude-supervisor is tested on Josui Prime before it reaches a dev container:
 # bump both files together, by hand.
 ARG CLAUDE_CODE_VERSION=2.1.304
-ARG CLAUDE_AGENT_VERSION=1.2.0
+# claude-supervisor (was claude-agent; the 1.x names still resolve through
+# 2.x) comes from its GitHub release, like ashigaru below, pinned by the
+# release's SHA256SUMS: one hash per RPM. A bump is the version, the three
+# hashes, and the version in the boot gate (tests/image/boot-check.sh).
+ARG CLAUDE_SUPERVISOR_VERSION=2.0.0
+ARG CLAUDE_SUPERVISOR_SHA256=1d720f3647b02238dee18097926ccca5b4f0430f2b099eacf8869cb39dd0ffee
+ARG CLAUDE_SUPERVISOR_MATRIX_SHA256=7c7a64910d746dd40bae0da8715ff1b27c260c32d600d1b28b9a2e0e4ced225e
+ARG CLAUDE_SUPERVISOR_TRENTINA_SHA256=6d813f4feff64ce6e29b33268c59780cd56f9110826f4c218450801417dec3f6
 # The Ashigaru CLI, whose `ashigaru hook` reports this seat to the Desk. 3.x
 # is a Python package shipped as an RPM on each GitHub release, built on
 # fedora:43, fedora:45 and centos:stream10; the fc45 build is noarch against Python 3.15,
@@ -118,14 +125,32 @@ RUN dnf -y upgrade && \
         python3 python3-devel python3-pip gcc make \
         uv pre-commit \
         nodejs nodejs-full-i18n npm \
-        "claude-code-${CLAUDE_CODE_VERSION}" \
-        "claude-agent-${CLAUDE_AGENT_VERSION}" "claude-agent-matrix-${CLAUDE_AGENT_VERSION}" \
-        "claude-agent-trentina-${CLAUDE_AGENT_VERSION}" && \
+        "claude-code-${CLAUDE_CODE_VERSION}" && \
     dnf -y clean all && \
     rm -rf /var/cache/dnf && \
-    claude --version && claude-agent --version && \
+    claude --version && \
     python3 -c 'import sys; assert sys.version_info[:2] >= (3, 14), sys.version' && \
     uv --version && tmux -V && podman --version
+
+# claude-supervisor 2.0.0 straight from its release, each RPM checked against
+# its pinned hash (the RPMs are unsigned; the hash is what was reviewed). Its
+# packages Obsolete the claude-agent ones, and /usr/bin/claude-agent is a link.
+RUN base="https://github.com/crunchtools/claude-supervisor/releases/download/v${CLAUDE_SUPERVISOR_VERSION}" && \
+    v="${CLAUDE_SUPERVISOR_VERSION}-1.noarch.rpm" && \
+    cd /tmp && \
+    for p in claude-supervisor claude-supervisor-matrix claude-supervisor-trentina; do \
+        curl -fsSL -o "$p-$v" "$base/$p-$v"; done && \
+    printf '%s  %s\n' \
+        "$CLAUDE_SUPERVISOR_SHA256" "claude-supervisor-$v" \
+        "$CLAUDE_SUPERVISOR_MATRIX_SHA256" "claude-supervisor-matrix-$v" \
+        "$CLAUDE_SUPERVISOR_TRENTINA_SHA256" "claude-supervisor-trentina-$v" \
+        | sha256sum -c --strict - && \
+    dnf -y install --setopt=install_weak_deps=0 ./claude-supervisor*-"$v" && \
+    rm -f ./claude-supervisor*-"$v" && \
+    dnf -y clean all && \
+    rm -rf /var/cache/dnf && \
+    test "$(claude-supervisor --version)" = "claude-supervisor ${CLAUDE_SUPERVISOR_VERSION}" && \
+    claude-agent --version > /dev/null
 
 # Straight from the release, not from a dnf repository: the crunchtools repo
 # does not carry ashigaru, and a release that has no RPM attached fails the
@@ -209,9 +234,9 @@ ENV HOME=/home/podman \
     PYTEST_XDIST_AUTO_NUM_WORKERS=4 \
     JOSUI_CONFIG_DIR=/etc/josui \
     JOSUI_SKILLS_DIR=/var/lib/josui/josui-skills \
-    CLAUDE_AGENT=1 \
-    CLAUDE_AGENT_AUDIT_DIR=/var/log/josui \
-    CLAUDE_AGENT_BREAKER_DIR=/tmp/josui-breaker \
+    CLAUDE_SUPERVISOR=1 \
+    CLAUDE_SUPERVISOR_AUDIT_DIR=/var/log/josui \
+    CLAUDE_SUPERVISOR_BREAKER_DIR=/tmp/josui-breaker \
     DISABLE_AUTOUPDATER=1 \
     DISABLE_ERROR_REPORTING=1 \
     DISABLE_TELEMETRY=1

@@ -343,7 +343,7 @@ class ManagedSettingsTest(unittest.TestCase):
         (group,) = [g for g in self.settings["hooks"]["SessionStart"] if g.get("matcher")]
         self.assertEqual(group["matcher"], "startup|clear|resume")
         (hook,) = group["hooks"]
-        self.assertEqual(hook["command"], "/usr/libexec/developer/ashigaru-hook next")
+        self.assertEqual(hook["command"], "/usr/libexec/claude-seat/ashigaru-hook next")
         self.assertIs(hook["async"], True)
         self.assertIs(hook["asyncRewake"], True)
         self.assertEqual(hook["timeout"], 86400)
